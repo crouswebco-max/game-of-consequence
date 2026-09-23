@@ -45,6 +45,26 @@ Anyone reaching the game through the public link is sent to the join page.
 
 ---
 
+## Running it on AWS (a cloud server)
+
+To play without anyone's Mac running the game, put it on an **Amazon EC2** instance. Everyone joins through the server's public address, and the host opens the projector screen with a password.
+
+1. In the EC2 console (I use **Europe (London)**), click **Launch instance**:
+   - **Name:** `consequence`
+   - **AMI:** Amazon Linux 2023
+   - **Instance type:** a free-tier one, like `t3.micro`
+   - **Key pair:** "Proceed without a key pair" (you can still connect with EC2 Instance Connect)
+   - **Network settings:** allow **HTTP traffic from the internet**
+   - **Advanced details → User data:** paste the whole of [`aws/ec2-user-data.sh`](aws/ec2-user-data.sh), after changing `HOST_PASSWORD` to your own secret
+2. Launch it and wait about 2 minutes, until the instance is **Running** with **2/2 checks passed**.
+3. Copy the instance's **Public IPv4 address**.
+4. **Projector (host):** open `http://<public-ip>/?host=<your password>`
+5. **Players:** scan the QR code on the projector, or open `http://<public-ip>/join`
+
+**Stop or terminate the instance when the game is over.** A free-tier instance is free for a limited number of hours, and after that it costs money for every hour it runs.
+
+On a server there's no "this Mac", so the host is recognised by the password in `CONSEQUENCE_HOST_PASSWORD` instead. Without the password, anyone opening the main address is sent to the player page.
+
 ## How a turn goes
 
 At the start of your turn your phone offers:

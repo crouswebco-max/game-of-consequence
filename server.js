@@ -83,6 +83,21 @@ function isThisMac(req) {
   return loop && !forwarded;
 }
 
+/**
+ * On a cloud server there is no "this Mac": the host sits at a laptop somewhere
+ * else. Set CONSEQUENCE_HOST_PASSWORD and open /?host=<password> to get the
+ * projector and its controls. Without the password everyone is a player.
+ */
+const HOST_PASSWORD = process.env.CONSEQUENCE_HOST_PASSWORD || '';
+
+function isHost(req, url) {
+  if (isThisMac(req)) return true;
+  if (!HOST_PASSWORD) return false;
+  const given = Buffer.from(url.searchParams.get('host') || '');
+  const want = Buffer.from(HOST_PASSWORD);
+  return given.length === want.length && crypto.timingSafeEqual(given, want);
+}
+
 let game = new Game();
 const tokens = new Map();                       // pid -> token
 const HOST_KEY = crypto.randomBytes(16).toString('hex');
@@ -220,7 +235,7 @@ const server = http.createServer(async (req, res) => {
   // ---- the projector
   if (p === '/' || p === '/board' || p === '/board.html') {
     // Anyone else who types the bare address is a player, so send them to join.
-    if (!isThisMac(req)) { res.writeHead(302, { location: '/join' }); return res.end(); }
+    if (!isHost(req, url)) { res.writeHead(302, { location: '/join' }); return res.end(); }
     const boot = game.bootstrap();
     boot.hostKey = HOST_KEY;
     boot.lanUrl = `http://${lanAddress()}:${PORT}/join`;
