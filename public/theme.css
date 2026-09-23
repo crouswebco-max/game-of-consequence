@@ -1,0 +1,161 @@
+/* A Game of Consequence — shared design tokens and components.
+   Both screens load this file, so the projector and the phones cannot drift. */
+
+:root {
+  /* ink — the dark the whole thing sits on */
+  --ink-900: #07080b;
+  --ink-800: #0b0d12;
+  --ink-700: #12151c;
+  --ink-600: #1a1e28;
+
+  /* paper — type */
+  --paper-100: #ece7dc;
+  --paper-200: #d5cfc2;
+  --paper-400: #8e8878;
+  --paper-600: #5c5749;
+
+  /* brass — the one warm accent, used sparingly so it still means something */
+  --brass-400: #d8b545;
+  --brass-500: #c9a227;
+  --brass-600: #9a7c1d;
+
+  /* blood — danger, accusations, the losing end */
+  --blood-400: #e04a62;
+  --blood-500: #c8102e;
+  --blood-600: #8e0b20;
+
+  --green-400: #6fd39a;
+
+  --edge: 1px solid rgba(201, 162, 39, .26);
+  --edge-soft: 1px solid rgba(236, 231, 220, .12);
+
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 20px;
+
+  --font-display: 'Cinzel', 'Hoefler Text', Georgia, 'Times New Roman', serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+
+  --shadow-lift: 0 18px 44px rgba(0, 0, 0, .55);
+  --shadow-deep: 0 30px 80px rgba(0, 0, 0, .7);
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; }
+
+body.stage {
+  background: var(--ink-900);
+  color: var(--paper-100);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* A faint vignette keeps a projected image from looking like a flat rectangle
+   of light on a wall. */
+body.stage::after {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none; z-index: 900;
+  background: radial-gradient(ellipse at 50% 42%, transparent 42%, rgba(0, 0, 0, .55) 100%);
+}
+
+/* ------------------------------------------------------------------ type */
+
+.display { font-family: var(--font-display); font-weight: 700; letter-spacing: .01em; margin: 0; }
+
+.eyebrow {
+  font-size: .68rem; letter-spacing: .26em; text-transform: uppercase;
+  color: var(--brass-500); font-weight: 650;
+}
+.eyebrow.blood { color: var(--blood-400); }
+
+.muted { color: var(--paper-400); }
+.brass { color: var(--brass-400); }
+.blood { color: var(--blood-400); }
+
+hr.hairline {
+  border: 0; height: 1px; margin: 1rem 0;
+  background: linear-gradient(90deg, transparent, rgba(201, 162, 39, .4), transparent);
+}
+
+/* --------------------------------------------------------------- surfaces */
+
+.panel {
+  background: linear-gradient(180deg, rgba(26, 30, 40, .86), rgba(11, 13, 18, .92));
+  border: var(--edge-soft);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lift);
+}
+
+/* ---------------------------------------------------------------- buttons */
+
+button {
+  font-family: var(--font-body);
+  font-size: .95rem;
+  font-weight: 500;
+  color: var(--paper-100);
+  background: rgba(26, 30, 40, .9);
+  border: var(--edge-soft);
+  border-radius: var(--r-sm);
+  padding: .85rem 1rem;
+  cursor: pointer;
+  transition: background .14s ease, border-color .14s ease, transform .08s ease, opacity .14s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+button:active { transform: scale(.985); }
+button:disabled { opacity: .38; cursor: default; }
+button:disabled:active { transform: none; }
+
+button.primary {
+  background: linear-gradient(180deg, var(--brass-400), var(--brass-600));
+  border-color: var(--brass-400);
+  color: #1a1403;
+  font-weight: 650;
+}
+button.danger {
+  background: linear-gradient(180deg, var(--blood-500), var(--blood-600));
+  border-color: var(--blood-400);
+  color: #fff;
+  font-weight: 650;
+}
+button.ghost { background: transparent; color: var(--paper-400); }
+button.ghost:hover { color: var(--paper-100); }
+
+@media (hover: hover) {
+  button:hover:not(:disabled) { border-color: rgba(201, 162, 39, .5); }
+}
+
+/* --------------------------------------------------------------- the cast */
+
+.token {
+  border-radius: 50%;
+  display: grid; place-items: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: #0a0a0a;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .35), 0 2px 8px rgba(0, 0, 0, .5);
+}
+
+/* ---------------------------------------------------------------- a card */
+
+.card-face {
+  background: linear-gradient(170deg, #f2ece0, #ddd5c4);
+  color: #14161c;
+  border-radius: var(--r-sm);
+  padding: .7rem .8rem;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .55), inset 0 0 0 1px rgba(0, 0, 0, .14);
+}
+.card-face .kind {
+  font-size: .58rem; letter-spacing: .2em; text-transform: uppercase;
+  color: #7c7362; font-weight: 700; margin-bottom: .2rem;
+}
+.card-face .title {
+  font-family: var(--font-display); font-weight: 700; line-height: 1.2;
+}
+
+/* ------------------------------------------------------------ reduced motion */
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .001ms !important; transition-duration: .001ms !important; }
+}

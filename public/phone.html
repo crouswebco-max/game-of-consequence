@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07080b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Your Hand</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;650&family=Special+Elite&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%230b0d12%27/%3E%3Ccircle cx=%2713%27 cy=%2713%27 r=%277%27 fill=%27none%27 stroke=%27%23c9a227%27 stroke-width=%272.5%27/%3E%3Cpath d=%27M18.5 18.5 L25 25%27 stroke=%27%23c9a227%27 stroke-width=%273%27 stroke-linecap=%27round%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/public/theme.css">
+<style>
+  body.stage {
+    min-height: 100vh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    overscroll-behavior: none;
+    -webkit-user-select: none; user-select: none;
+  }
+  #app { max-width: 560px; margin: 0 auto; padding: 1rem 1rem 5.5rem; display: flex; flex-direction: column; gap: 1rem; }
+
+  .head { display: flex; align-items: center; gap: .75rem; padding-top: .4rem; }
+  .head .token { width: 2.9rem; height: 2.9rem; font-size: .95rem; flex: none; }
+  img.token { object-fit: cover; object-position: top; background: var(--ink-700);
+              box-shadow: 0 0 0 2px var(--tint, var(--brass-500)), 0 2px 8px rgba(0,0,0,.5); }
+  .head-name { font-family: var(--font-display); font-size: 1.05rem; line-height: 1.15; }
+  .head-sub { font-size: .75rem; color: var(--paper-400); }
+
+  .status { padding: 1rem; text-align: center; }
+  .status .eyebrow { margin-bottom: .45rem; }
+  .status .big { font-family: var(--font-display); font-size: 1.35rem; line-height: 1.25; }
+
+  .stack { display: flex; flex-direction: column; gap: .6rem; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: .55rem; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: .55rem; }
+
+  .pick { text-align: left; padding: .8rem .85rem; line-height: 1.25; }
+  .pick small { display: block; font-size: .68rem; color: var(--paper-400); margin-top: .15rem; }
+  .pick.on { background: rgba(201,162,39,.24); border-color: var(--brass-400); }
+  .pick.on small { color: var(--brass-400); }
+
+  .chargrid { display: grid; grid-template-columns: 1fr 1fr; gap: .55rem; }
+  .charbtn { display: flex; align-items: center; gap: .6rem; text-align: left; padding: .7rem; }
+  .charbtn .token { width: 2.3rem; height: 2.3rem; font-size: .8rem; flex: none; }
+  .charbtn b { font-family: var(--font-display); font-weight: 600; font-size: .85rem; display: block; }
+  .charbtn small { font-size: .66rem; color: var(--paper-400); }
+
+  .hand { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: .5rem; }
+  .hand .card-face { padding: .5rem .55rem; }
+  .hand .card-face .title { font-size: .82rem; }
+
+  .roomlist button { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+  .roomlist .tag { font-size: .68rem; color: var(--brass-400); letter-spacing: .1em; text-transform: uppercase; }
+
+  /* notebook */
+  .nb { display: flex; flex-direction: column; gap: .35rem; }
+  .nb-group { font-size: .64rem; letter-spacing: .24em; text-transform: uppercase; color: var(--brass-500); margin: .7rem 0 .2rem; }
+  .nb-row { display: flex; align-items: center; gap: .6rem; width: 100%; padding: .6rem .7rem; font-size: .88rem; }
+  .nb-row span { flex: 1; text-align: left; }
+  .nb-mark { width: 1.8rem; height: 1.8rem; border-radius: 50%; display: grid; place-items: center; font-size: .95rem; font-weight: 700; border: var(--edge-soft); flex: none; }
+  .nb-mark.have { background: var(--brass-500); color: var(--ink-900); border-color: var(--brass-400); }
+  .nb-mark.shown { background: rgba(201,162,39,.3); color: var(--brass-400); }
+  .nb-mark.no { background: rgba(200,16,46,.2); color: var(--blood-400); }
+  .nb-mark.yes { background: rgba(63,158,106,.22); color: #6fd39a; }
+  .nb-mark.maybe { color: var(--paper-400); }
+  .nb-hint { font-size: .72rem; color: var(--paper-400); line-height: 1.5; }
+
+  /* bottom tabs */
+  .tabs {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 400;
+    display: flex; border-top: var(--edge);
+    background: rgba(7,8,11,.94); backdrop-filter: blur(12px);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .tabs button { flex: 1; border: 0; border-radius: 0; background: transparent; color: var(--paper-400); font-size: .78rem; letter-spacing: .1em; text-transform: uppercase; padding: 1rem .5rem; }
+  .tabs button.on { color: var(--brass-400); box-shadow: inset 0 2px 0 var(--brass-500); }
+
+  .toast { position: fixed; left: 50%; bottom: 5rem; transform: translateX(-50%); z-index: 700; background: rgba(200,16,46,.9); color: #fff; padding: .7rem 1.1rem; border-radius: 99px; font-size: .85rem; box-shadow: 0 8px 24px rgba(0,0,0,.6); }
+
+  input[type=text] {
+    width: 100%; font-family: var(--font-body); font-size: 1.1rem; padding: .95rem 1rem;
+    border-radius: var(--r-sm); border: var(--edge); background: rgba(0,0,0,.35); color: var(--paper-100);
+  }
+  input[type=text]:focus { outline: none; border-color: var(--brass-400); }
+
+  /* ---- the case file: manila, typewriter, rubber stamps ---- */
+  :root { --type: 'Special Elite', 'American Typewriter', 'Courier New', monospace; --manila: #d8c39a; --manila-d: #b9a172; }
+  .dossiers { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; }
+  .dossier { position: relative; text-align: left; padding: .55rem .55rem .7rem; border-radius: 4px 4px 6px 6px;
+             background: linear-gradient(170deg, #e2cfa6, var(--manila) 60%, var(--manila-d)); color: #2b2114;
+             border: 0; box-shadow: 0 10px 22px rgba(0,0,0,.55), inset 0 0 0 1px rgba(80,55,20,.35); }
+  .dossier::before { content: ''; position: absolute; top: -9px; left: 12px; width: 44%; height: 12px;
+                     background: var(--manila); border-radius: 5px 5px 0 0; box-shadow: inset 0 1px 0 rgba(255,255,255,.3); }
+  .dossier .no { font-family: var(--type); font-size: .62rem; letter-spacing: .08em; color: #6b5433; }
+  .dossier img { width: 100%; aspect-ratio: 4/5; object-fit: cover; object-position: top; display: block; margin: .3rem 0 .45rem;
+                 filter: sepia(.35) contrast(1.05); box-shadow: 0 3px 8px rgba(0,0,0,.4); border: 3px solid #f4ecdc; transform: rotate(-1.5deg); }
+  .dossier:nth-child(even) img { transform: rotate(1.4deg); }
+  .dossier b { font-family: var(--type); font-weight: 400; font-size: .86rem; display: block; line-height: 1.15; }
+  .dossier small { display: block; font-family: Georgia, serif; font-style: italic; font-size: .68rem; color: #5a4628; margin-top: .2rem; }
+  .dossier .clip { position: absolute; top: -6px; right: 14px; width: 12px; height: 34px; border: 2px solid #9aa0a6; border-radius: 6px; }
+  .dossier .stamp { position: absolute; top: 38%; left: 50%; transform: translate(-50%,-50%) rotate(-14deg);
+                    font-family: var(--type); font-size: 1.05rem; letter-spacing: .08em; padding: .15rem .5rem;
+                    border: 3px double currentColor; border-radius: 4px; background: rgba(240,230,210,.55); white-space: nowrap; }
+  .dossier.mine .stamp { color: #1f6b35; animation: stamp .35s cubic-bezier(.2,1.6,.4,1) both; }
+  .dossier.taken { opacity: .78; } .dossier.taken .stamp { color: #8e1b1b; }
+  .dossier.taken img { filter: grayscale(1) brightness(.8); }
+  @keyframes stamp { from { transform: translate(-50%,-50%) rotate(-14deg) scale(2.2); opacity: 0; } }
+  .casehead { font-family: var(--type); letter-spacing: .06em; }
+  .typed { font-family: var(--type); }
+
+  /* evidence tags */
+  .card-face { position: relative; }
+  .hand .card-face::after { content: ''; position: absolute; top: 7px; right: 7px; width: 7px; height: 7px; border-radius: 50%;
+                            background: #0b0d12; box-shadow: 0 0 0 2px #b9a172; }
+  .card-face .kind { font-family: var(--type); }
+
+  /* the phone map */
+  .minimap { width: 100%; display: block; border-radius: 8px; background: #0d0b09; box-shadow: 0 10px 26px rgba(0,0,0,.6); touch-action: manipulation; }
+  .minimap .cor { fill: #2e2017; stroke: #1a110b; stroke-width: .04; }
+  .minimap .rm { stroke: #b8923a; stroke-width: .1; }
+  .minimap .rmn { font-family: var(--font-display); font-size: .7px; fill: #f3ead6; text-anchor: middle; paint-order: stroke; stroke: #000; stroke-width: .14px; }
+  .minimap .go { fill: rgba(226,194,90,.55); stroke: #f2d16b; stroke-width: .06; }
+  .minimap .goroom { fill: rgba(226,194,90,.2); stroke: #f2d16b; stroke-width: .22; animation: glowr 1.2s ease-in-out infinite; }
+  @keyframes glowr { 50% { stroke-opacity: .35; } }
+  .minimap .you { stroke: #fff; stroke-width: .12; }
+  .dice2 { display: flex; justify-content: center; gap: .8rem; }
+  .dice2 .die { margin: .3rem 0 .6rem; width: 70px; height: 70px; }
+  .dice2 .die:nth-child(2).tumble { animation-delay: .12s; }
+  .choice { display: flex; align-items: center; gap: .7rem; text-align: left; width: 100%; }
+  .choice .ico { font-size: 1.3rem; width: 1.8rem; text-align: center; flex: none; }
+  .choice small { display: block; color: var(--paper-400); font-size: .72rem; margin-top: .1rem; }
+  .toward { display: grid; grid-template-columns: 1fr 1fr; gap: .45rem; }
+  .toward button { font-size: .8rem; padding: .6rem .6rem; text-align: left; }
+  .toward button small { display: block; font-size: .64rem; color: var(--paper-400); }
+
+  /* The projector's vignette belongs on a wall, not on a phone held in a hand. */
+  body.stage::after { display: none; }
+
+  /* ---- the detective notepad: cream paper, ruled lines, pencil marks ---- */
+  .pad { background: #efe6d0; color: #2a2118; border-radius: 6px; padding: .9rem .7rem 1.2rem;
+         box-shadow: 0 18px 40px rgba(0,0,0,.6), inset 0 0 0 1px rgba(60,40,20,.25);
+         background-image: repeating-linear-gradient(180deg, transparent 0 29px, rgba(70,110,160,.22) 29px 30px);
+         position: relative; }
+  .pad::before { content: ''; position: absolute; top: 0; bottom: 0; left: 2.1rem; width: 1px; background: rgba(190,40,40,.35); }
+  .pad h2 { font-family: var(--font-display); color: #8e1b1b; text-align: center; letter-spacing: .22em;
+            font-size: 1.05rem; margin: 0 0 .15rem; }
+  .pad .sub { text-align: center; font-size: .66rem; color: #6b5a43; letter-spacing: .12em; text-transform: uppercase; margin-bottom: .7rem; }
+  .pad table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .pad th, .pad td { height: 30px; padding: 0; }
+  .pad thead th { font-size: .6rem; font-weight: 700; color: #5a4a35; text-transform: uppercase; vertical-align: bottom; padding-bottom: 3px; }
+  .pad thead th .dot { display: block; width: 12px; height: 12px; border-radius: 50%; margin: 0 auto 2px; border: 1px solid rgba(0,0,0,.35); }
+  .pad thead th.me { color: #8e1b1b; }
+  .pad .grp td { font-family: var(--font-display); font-size: .72rem; letter-spacing: .2em; color: #8e1b1b; padding-top: 8px; }
+  .pad .lbl { text-align: left; font-family: Georgia, 'Times New Roman', serif; font-size: .84rem; padding-left: .2rem;
+              white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+  .pad .lbl.out { text-decoration: line-through; text-decoration-color: #8e1b1b; text-decoration-thickness: 2px; color: #8c7b62; }
+  .pad .cell { text-align: center; border-left: 1px solid rgba(60,40,20,.18); cursor: pointer;
+               font-family: 'Bradley Hand', 'Segoe Print', 'Comic Sans MS', cursive; font-size: 1.05rem; font-weight: 700; }
+  .pad .cell.mine { background: rgba(142,27,27,.07); cursor: default; }
+  .pad .m-yes { color: #1f6b35; } .pad .m-no { color: #8e1b1b; } .pad .m-maybe { color: #6b5a43; }
+  .pad-key { font-size: .7rem; color: var(--paper-400); line-height: 1.55; margin-top: .7rem; }
+  .pad-key b { color: var(--paper-100); }
+
+  /* ---- rules ---- */
+  .rules h3 { font-family: var(--font-display); font-size: 1rem; margin: 1.1rem 0 .35rem; color: var(--brass-400); letter-spacing: .06em; }
+  .rules p, .rules li { font-size: .9rem; line-height: 1.6; color: var(--paper-200); margin: 0 0 .4rem; }
+  .rules ol { padding-left: 1.2rem; margin: 0; }
+  .rules .goal { padding: 1rem; text-align: center; }
+  .rules .goal b { font-family: var(--font-display); font-size: 1.15rem; display: block; margin-top: .3rem; color: var(--paper-100); }
+
+  /* ---- the die ---- */
+  .die { width: 84px; height: 84px; margin: .4rem auto .8rem; background: #f4efe4; border-radius: 16px;
+         box-shadow: inset 0 -5px 0 rgba(0,0,0,.18), 0 10px 24px rgba(0,0,0,.6); display: block; }
+  .die.tumble { animation: tumble .9s cubic-bezier(.3,.7,.4,1); }
+  @keyframes tumble {
+    0% { transform: translateY(-40px) rotate(-200deg) scale(.6); opacity: .2; }
+    60% { transform: translateY(6px) rotate(20deg) scale(1.05); opacity: 1; }
+    100% { transform: none; }
+  }
+
+  .reveal-card { display: grid; place-items: center; gap: 1rem; padding: 1.4rem; }
+  .flipcard { width: 62%; aspect-ratio: 5/7; border-radius: 12px; border: 2px solid var(--brass-500);
+    background: repeating-linear-gradient(45deg, #3a0c12 0 10px, #4a1018 10px 20px);
+    box-shadow: 0 16px 34px rgba(0,0,0,.7); display: grid; place-items: center; color: var(--brass-400);
+    font-family: var(--font-display); font-size: .9rem; letter-spacing: .08em; animation: bob 1.8s ease-in-out infinite; }
+  .flipcard span { background: rgba(0,0,0,.55); padding: .4rem .7rem; border-radius: 6px; }
+  @keyframes bob { 50% { transform: translateY(-5px) rotate(-1deg); } }
+  .flipped { width: 62%; animation: flipin .55s ease both; }
+  .flipped .card-face { width: 100% !important; }
+  @keyframes flipin { from { transform: rotateY(90deg); } to { transform: none; } }
+  .reveal-card .card-face { width: 62%; padding: 1.1rem; }
+  .reveal-card .card-face .title { font-size: 1.15rem; }
+</style>
+</head>
+<body class="stage">
+<div id="app"></div>
+<div class="tabs" id="tabs"></div>
+
+<script src="/public/sound.js"></script>
+<script>/*__BOOT__*/</script>
+<script>
+'use strict';
+const B = window.__BOOT__;
+const SUSPECT = {}, WEAPON = {}, ROOM = {};
+B.suspects.forEach(s => SUSPECT[s.id] = s);
+B.weapons.forEach(w => WEAPON[w.id] = w);
+B.rooms.forEach(r => ROOM[r.id] = r);
+
+const app = document.getElementById('app');
+const tabsEl = document.getElementById('tabs');
+const STORE = 'consequence:' + B.code;
+
+// Storage can be unavailable entirely — Safari private browsing, blocked
+// site data, an embedded webview. It is only a convenience (it survives a
+// refresh), so every use is guarded and the game works without it.
+const store = {
+  read() { try { return JSON.parse(localStorage.getItem(STORE) || 'null'); } catch (e) { return null; } },
+  write(v) { try { localStorage.setItem(STORE, JSON.stringify(v)); } catch (e) { /* in-memory only */ } },
+  clear() { try { localStorage.removeItem(STORE); } catch (e) { /* nothing to clear */ } }
+};
+
+let me = store.read();      // { pid, token }
+
+let pub = null, priv = null;
+let ui = { tab: 'play', mode: 'idle', sel: {}, armed: false };
+
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g,
+  c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const nameOf = pid => {
+  const p = pub && pub.players.find(x => x.id === pid);
+  return p ? (p.charId ? SUSPECT[p.charId].name : p.name) : 'Someone';
+};
+const cardName = id => (SUSPECT[id] || WEAPON[id] || ROOM[id]).name;
+const cardKind = id => SUSPECT[id] ? 'Person' : WEAPON[id] ? 'Weapon' : 'Place';
+
+/** A short vibration where the phone supports it (Android; iPhones ignore it). */
+function buzz(pattern) {
+  try { if (navigator.vibrate) navigator.vibrate(pattern); } catch (e) {}
+}
+
+/** Nudge the player when the game starts waiting on them specifically. */
+let lastNeed = '';
+function nudge() {
+  if (!pub || !priv) return;
+  const need = priv.mustDisprove ? 'disprove'
+    : priv.shownToYou ? 'shown'
+    : (priv.isYourTurn && pub.turnPhase === 'roll') ? 'turn:' + pub.round
+    : '';
+  if (need && need !== lastNeed) buzz(need === 'disprove' ? [80, 60, 80] : [60, 40, 120]);
+  lastNeed = need;
+}
+
+function toast(msg) {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2600);
+}
+
+// ------------------------------------------------------------------ transport
+let stream = null;
+function connect() {
+  if (!me) return renderJoin();
+  if (stream) stream.close();
+  stream = new EventSource(`/events?role=player&pid=${encodeURIComponent(me.pid)}&token=${encodeURIComponent(me.token)}`);
+  stream.onmessage = ev => {
+    const msg = JSON.parse(ev.data);
+    if (msg.type === 'kicked') { forget(); return; }
+    if (msg.type === 'state') { pub = msg.pub; priv = msg.priv; render(); nudge(); }
+  };
+  stream.onerror = () => {
+    // A 401 means the server was restarted and this identity is stale.
+    if (stream.readyState === EventSource.CLOSED) forget();
+  };
+}
+function forget() {
+  store.clear();
+  me = null; pub = null; priv = null;
+  if (stream) { stream.close(); stream = null; }
+  renderJoin();
+}
+
+async function act(body) {
+  const r = await fetch('/api/action', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(Object.assign({ pid: me.pid, token: me.token }, body))
+  });
+  const out = await r.json().catch(() => ({}));
+  if (out.error) toast(out.error);
+  return out;
+}
+
+// ---------------------------------------------------------------- join screen
+function renderJoin(err) {
+  tabsEl.style.display = 'none';
+  app.innerHTML = `
+    <div style="padding-top:2.5rem">
+      <div class="eyebrow">A Game of Consequence</div>
+      <h1 class="display" style="font-size:2rem;margin:.5rem 0 1.2rem;line-height:1.1">Room ${esc(B.code)}</h1>
+      <hr class="hairline">
+      <p class="muted" style="font-size:.9rem;line-height:1.6">
+        Your phone is your hand of cards, your notebook and your voice. Keep it to yourself.</p>
+      <div class="stack" style="margin-top:1rem">
+        <input type="text" id="nm" placeholder="Your name" maxlength="18" autocomplete="off"
+               autocapitalize="words" enterkeyhint="go">
+        <button class="primary" id="go">Take a seat</button>
+        ${err ? `<div class="blood" style="font-size:.85rem">${esc(err)}</div>` : ''}
+      </div>
+    </div>`;
+  const input = document.getElementById('nm');
+  const go = document.getElementById('go');
+  const submit = async () => {
+    const name = input.value.trim();
+    if (!name) { input.focus(); return; }
+    go.disabled = true;
+    const r = await fetch('/api/join', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    const out = await r.json().catch(() => ({}));
+    if (out.error) { go.disabled = false; return renderJoin(out.error); }
+    me = { pid: out.pid, token: out.token };
+    store.write(me);
+    connect();
+  };
+  go.onclick = submit;
+  input.onkeydown = e => { if (e.key === 'Enter') submit(); };
+}
+
+// --------------------------------------------------------------------- render
+function render() {
+  if (!pub || !priv) return;
+
+  if (pub.phase === 'lobby') { tabsEl.style.display = 'none'; return renderLobby(); }
+
+  tabsEl.style.display = '';
+  const TAB_NAMES = { play: 'Table', notebook: 'Notepad', rules: 'Rules' };
+  tabsEl.innerHTML = ['play', 'notebook', 'rules'].map(t =>
+    `<button class="${ui.tab === t ? 'on' : ''}" data-tab="${t}">${TAB_NAMES[t]}</button>`).join('');
+  tabsEl.querySelectorAll('[data-tab]').forEach(b =>
+    b.onclick = () => { ui.tab = b.dataset.tab; render(); });
+
+  app.innerHTML = headHtml() + (ui.tab === 'notebook' ? notebookHtml()
+    : ui.tab === 'rules' ? rulesHtml() : tableHtml());
+  wire();
+}
+
+function headHtml() {
+  const s = SUSPECT[priv.you.charId];
+  if (!s) return '';
+  return `<div class="head">
+    <img class="token" src="/public/portraits/${s.id}.jpg" alt="" style="--tint:${s.colour}">
+    <div style="min-width:0">
+      <div class="head-name">${esc(s.name)}</div>
+      <div class="head-sub">${esc(priv.you.name)}${priv.you.eliminated ? ' · out of the running' : ''}${priv.yourRoom ? ' · ' + esc(ROOM[priv.yourRoom].name) : ''}</div>
+    </div>
+  </div>`;
+}
+
+// ---- lobby: the case files
+function renderLobby() {
+  const taken = {};
+  pub.players.forEach(p => { if (p.charId) taken[p.charId] = p; });
+  const mine = priv.you.charId;
+  app.innerHTML = `
+    <div style="padding-top:1rem">
+      <div class="eyebrow">Case file ${esc(B.code)} · Hollowmere House</div>
+      <h1 class="display casehead" style="font-size:1.45rem;margin:.4rem 0 .3rem">Choose your suspect.</h1>
+      <p class="muted typed" style="font-size:.8rem;margin:0 0 1.3rem">Lord Edgar Hollowmere was found dead at midnight. Six guests. One of them is lying.</p>
+      <div class="dossiers">
+        ${B.suspects.map((s, i) => {
+          const holder = taken[s.id];
+          const isMine = mine === s.id;
+          const dis = holder && !isMine;
+          return `<button class="dossier ${isMine ? 'mine' : ''} ${dis ? 'taken' : ''}" data-claim="${s.id}" ${dis ? 'disabled' : ''}>
+            <span class="clip"></span>
+            <div class="no">SUSPECT No. 0${i + 1}</div>
+            <img src="/public/portraits/${s.id}.jpg" alt="">
+            <b>${esc(s.name)}</b>
+            <small>${esc(s.epithet)}</small>
+            ${isMine ? '<span class="stamp">YOU</span>' : dis ? `<span class="stamp">${esc(holder.name.toUpperCase().slice(0, 10))}</span>` : ''}
+          </button>`;
+        }).join('')}
+      </div>
+      <div class="status panel" style="margin-top:1.2rem">
+        ${mine
+          ? `<div class="eyebrow">You are playing</div><div class="big">${esc(SUSPECT[mine].name)}</div>
+             <div class="muted" style="font-size:.82rem;margin-top:.5rem">Keep your phone close. Waiting for the host to begin.</div>`
+          : `<div class="muted" style="font-size:.9rem">Tap a file to take that suspect.</div>`}
+      </div>
+      <div style="margin-top:1.2rem">${rulesHtml()}</div>
+    </div>`;
+  app.querySelectorAll('[data-claim]').forEach(b => b.onclick = () => {
+    voice(b.dataset.claim);                    // play it inside the tap, or phones will refuse
+    try { SOUND.unlock(); SFX.stamp(); } catch (e) {}
+    buzz(40);
+    act({ type: 'claim', charId: b.dataset.claim });
+  });
+}
+
+/** Each suspect introduces themselves, on your phone, when you take their file. */
+let voiceEl = null;
+function voice(id) {
+  const s = SUSPECT[id];
+  try {
+    if (voiceEl) voiceEl.pause();
+    voiceEl = new Audio('/public/audio/voice-' + id + '.mp3');
+    voiceEl.volume = 1;
+    voiceEl.play().catch(() => speakName(s));
+    voiceEl.onerror = () => speakName(s);
+  } catch (e) { speakName(s); }
+}
+function speakName(s) {
+  try {
+    const u = new SpeechSynthesisUtterance(s.name + '.');
+    u.rate = .85; u.pitch = .8;
+    const v = speechSynthesis.getVoices().find(v => /en-GB/i.test(v.lang));
+    if (v) u.voice = v;
+    speechSynthesis.cancel(); speechSynthesis.speak(u);
+  } catch (e) { /* no voice on this phone — the stamp still lands */ }
+}
+
+// ---- the house, small enough to hold
+function mapHtml(interactive) {
+  const L = B.board;
+  const reach = interactive && pub.reach;
+  const goCells = new Set(reach ? reach.cells : []);
+  const goRooms = new Set(reach ? reach.rooms : []);
+  let out = `<svg class="minimap" viewBox="-.2 -.2 24.4 24.4">`;
+  for (let y = 0; y < L.h; y++) for (let x = 0; x < L.w; x++) {
+    if (L.grid[y][x] !== 1) continue;
+    const k = x + ',' + y;
+    out += goCells.has(k)
+      ? `<rect class="go" x="${x + .06}" y="${y + .06}" width=".88" height=".88" rx=".15" data-go="${k}"/>`
+      : `<rect class="cor" x="${x}" y="${y}" width="1" height="1"/>`;
+  }
+  const [c0, c1, c2, c3] = L.centre;
+  out += `<rect x="${c0}" y="${c1}" width="${c2 - c0 + 1}" height="${c3 - c1 + 1}" fill="#07060a" stroke="#6b5424" stroke-width=".1"/>`;
+  out += `<text x="${(c0 + c2 + 1) / 2}" y="${(c1 + c3 + 1) / 2 + .5}" font-size="1.6" fill="rgba(226,194,90,.6)" text-anchor="middle" font-family="Georgia">?</text>`;
+  for (const [id, r] of Object.entries(L.rooms)) {
+    const w = r[2] - r[0] + 1, h = r[3] - r[1] + 1;
+    out += `<image href="/public/rooms/${id}-tile.jpg" x="${r[0]}" y="${r[1]}" width="${w}" height="${h}" preserveAspectRatio="xMidYMid slice" opacity=".55"/>`;
+    out += `<rect class="rm ${goRooms.has(id) ? 'goroom' : ''}" x="${r[0]}" y="${r[1]}" width="${w}" height="${h}" fill="${goRooms.has(id) ? '' : 'rgba(0,0,0,.35)'}" ${goRooms.has(id) ? `data-go="r:${id}"` : ''}/>`;
+    out += `<text class="rmn" x="${r[0] + w / 2}" y="${r[1] + h / 2 + .25}" ${goRooms.has(id) ? `data-go="r:${id}"` : ''}>${esc(ROOM[id].name.replace(/^The /, ''))}</text>`;
+  }
+  for (const d of L.doors) {
+    const r = L.rooms[d.room];
+    const [x1, y1, x2, y2] = d.side === 'w' ? [r[0], d.y + .15, r[0], d.y + .85] : d.side === 'e' ? [r[2] + 1, d.y + .15, r[2] + 1, d.y + .85]
+      : d.side === 'n' ? [d.x + .15, r[1], d.x + .85, r[1]] : [d.x + .15, r[3] + 1, d.x + .85, r[3] + 1];
+    out += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#e2c25a" stroke-width=".3"/>`;
+  }
+  // everyone's pawn, you outlined in white
+  const inRoom = {};
+  for (const p of pub.players) {
+    const c = SUSPECT[p.charId]; if (!c) continue;
+    let x, y;
+    if (p.cell) { x = p.cell[0] + .5; y = p.cell[1] + .5; }
+    else if (p.room) {
+      const r = L.rooms[p.room]; const i = (inRoom[p.room] = (inRoom[p.room] || 0) + 1) - 1;
+      x = r[0] + .8 + (i % 4) * 1.1; y = r[1] + .9;
+    } else continue;
+    out += `<circle cx="${x}" cy="${y}" r=".48" fill="${c.colour}" class="${p.id === priv.you.id ? 'you' : ''}" stroke="rgba(0,0,0,.6)" stroke-width=".06"/>`;
+  }
+  return out + '</svg>';
+}
+
+// ---- the table tab
+function tableHtml() {
+  // 1. A card was just shown to you, privately.
+  if (priv.shownToYou) {
+    const key = 'shown:' + priv.shownToYou.by + ':' + priv.shownToYou.card;
+    if (ui.flipped !== key) {
+      return `<div class="panel reveal-card">
+        <div class="eyebrow">${esc(nameOf(priv.shownToYou.by))} is showing you a card</div>
+        <div class="muted" style="font-size:.85rem;text-align:center">Hold your phone close. Nobody else gets to see this.</div>
+        <button class="flipcard" data-flip="${esc(key)}"><span>Tap to turn it over</span></button>
+      </div>` + handHtml();
+    }
+    return `<div class="panel reveal-card">
+      <div class="eyebrow">${esc(nameOf(priv.shownToYou.by))} showed you</div>
+      <div class="flipped">${cardFaceHtml(priv.shownToYou.card)}</div>
+      <div class="muted" style="font-size:.82rem;text-align:center">
+        Nobody else saw this. It is already ticked in your notebook.</div>
+      <button class="primary" data-act="continue" style="width:100%">Understood</button>
+    </div>` + handHtml();
+  }
+
+  // 2. A moment of yours is on the big screen and needs acknowledging.
+  if (priv.awaitingYourAck && pub.phase !== 'over') {
+    const kind = pub.reveal && pub.reveal.kind;
+    const body = kind === 'wrong'
+      ? `<div class="eyebrow blood">Your accusation was wrong</div>
+         <div class="big" style="margin:.5rem 0">You are out of the running.</div>
+         <div class="muted" style="font-size:.85rem">You keep your cards and must still disprove other people's suggestions — so you are not done being useful.</div>`
+      : `<div class="eyebrow">Nobody could disprove it</div>
+         <div class="big blood" style="margin:.5rem 0">That is a real lead.</div>
+         <div class="muted" style="font-size:.85rem">Either one of those three is in the envelope, or you are holding it yourself.</div>`;
+    return `<div class="panel status">${body}
+      <button class="primary" data-act="continue" style="width:100%;margin-top:1rem">Continue</button>
+    </div>` + handHtml();
+  }
+
+  // 3. You are being asked to disprove.
+  if (priv.mustDisprove) {
+    const s = pub.suggestion;
+    return `<div class="panel status">
+      <div class="eyebrow">${esc(nameOf(s.suggesterId))} suggests</div>
+      <div class="big" style="margin:.5rem 0 1rem">${esc(SUSPECT[s.suspect].name)}, with the
+        ${esc(WEAPON[s.weapon].name)}, in the ${esc(ROOM[s.room].name)}.</div>
+      <div class="muted" style="font-size:.85rem;margin-bottom:.8rem">
+        You must show one of these. Only ${esc(nameOf(s.suggesterId))} will see it.</div>
+      <div class="stack">${priv.mustDisprove.options.map(c =>
+        `<button class="pick" data-disprove="${c}">${esc(cardName(c))}
+          <small>${esc(cardKind(c))}</small></button>`).join('')}</div>
+    </div>`;
+  }
+
+  // 4. The game is over.
+  if (pub.phase === 'over') {
+    const won = pub.winner === priv.you.id;
+    const sol = pub.reveal && pub.reveal.solution;
+    return `<div class="panel status">
+      <div class="eyebrow">${pub.winner ? 'Case closed' : 'Unsolved'}</div>
+      <div class="big ${won ? 'brass' : ''}" style="margin:.5rem 0">
+        ${pub.winner ? esc(nameOf(pub.winner)) + (won ? ' — you' : '') + ' solved it' : 'The murderer walked free'}</div>
+      ${sol ? `<div class="muted" style="font-size:.9rem;line-height:1.6">It was ${esc(SUSPECT[sol.suspect].name)},
+        with the ${esc(WEAPON[sol.weapon].name)}, in the ${esc(ROOM[sol.room].name)}.</div>` : ''}
+      <div class="muted" style="font-size:.8rem;margin-top:1rem">The host can start a new game from the big screen.</div>
+    </div>` + handHtml();
+  }
+
+  // 5. Not your turn.
+  if (!priv.isYourTurn) {
+    const s = pub.suggestion;
+    return `<div class="panel status">
+      <div class="eyebrow">${priv.you.eliminated ? 'You are out — but still hold cards' : 'Waiting'}</div>
+      <div class="big">${esc(nameOf(pub.currentPlayerId))}</div>
+      <div class="muted" style="font-size:.85rem;margin-top:.4rem">
+        ${s ? 'A suggestion is on the table.' : 'is taking their turn.'}</div>
+    </div>` + handHtml();
+  }
+
+  // 6. Your turn.
+  if (pub.turnPhase === 'roll') {
+    if (ui.mode === 'accuse') return accuseHtml();
+    const where = priv.yourRoom ? 'You are in ' + ROOM[priv.yourRoom].name + '.' : 'You are in the corridor.';
+    return `<div class="panel status">
+      <div class="eyebrow">Your turn</div>
+      <div class="big" style="margin:.4rem 0 .3rem">What will you do?</div>
+      <div class="muted" style="font-size:.82rem;margin-bottom:1rem">${esc(where)}</div>
+      <div class="dice2">${dieSvg(0, false)}${dieSvg(0, false)}</div>
+      <div class="stack">
+        <button class="primary" data-act="roll" style="font-size:1.1rem;padding:1rem">Roll the dice</button>
+        ${priv.canPassage ? `<button class="choice" data-act="passage"><span class="ico">⇄</span>
+          <span>Take the secret passage<small>Straight to ${esc(ROOM[priv.passageTo].name)} — no roll needed, and you can suggest there.</small></span></button>` : ''}
+        ${priv.canStay ? `<button class="choice" data-act="stay"><span class="ico">✋</span>
+          <span>Stay and make a suggestion<small>You were dragged into ${esc(ROOM[priv.yourRoom].name)}, so you may ask here without moving.</small></span></button>` : ''}
+        <button class="choice ghost" data-mode="accuse"><span class="ico">⚖</span>
+          <span>Make a formal accusation<small>Only if you are sure. Wrong, and you are out.</small></span></button>
+      </div>
+    </div>` + mapHtml(false) + handHtml();
+  }
+
+  if (pub.turnPhase === 'move') {
+    const key = pub.round + ':' + pub.currentPlayerId + ':' + (pub.dice || []).join('-');
+    const fresh = ui.lastDie !== key;
+    ui.lastDie = key;
+    const rooms = (pub.reach && pub.reach.rooms) || [];
+    const toward = pub.reach && pub.reach.toward || {};
+    const far = B.rooms.filter(r => !rooms.includes(r.id) && r.id !== priv.yourRoom && toward[r.id])
+      .sort((a, b) => toward[a.id].left - toward[b.id].left);
+    return `<div class="panel status">
+      <div class="eyebrow">You rolled ${pub.dice[0]} and ${pub.dice[1]}</div>
+      <div class="dice2">${dieSvg(pub.dice[0], fresh)}${dieSvg(pub.dice[1], fresh)}</div>
+      <div class="big" style="margin:0 0 .3rem">${pub.die} squares</div>
+      <div class="muted" style="font-size:.8rem;margin-bottom:.8rem">Tap a glowing square or room on the map. Walking into a room ends your move.</div>
+      ${rooms.length ? `<div class="stack" style="margin-bottom:.8rem">${rooms.map(r =>
+        `<button class="primary" data-go="r:${r}">Walk into ${esc(ROOM[r].name)}</button>`).join('')}</div>` : ''}
+    </div>
+    ${mapHtml(true)}
+    ${far.length ? `<div class="panel status" style="text-align:left">
+      <div class="eyebrow" style="margin-bottom:.6rem">Or head towards…</div>
+      <div class="toward">${far.map(r => `<button data-toward="${r.id}">${esc(r.name.replace(/^The /, ''))}
+        <small>${toward[r.id].left} squares left after this</small></button>`).join('')}</div>
+    </div>` : ''}`;
+  }
+
+  if (pub.turnPhase === 'action') {
+    if (ui.mode === 'suggest') return suggestHtml();
+    if (ui.mode === 'accuse') return accuseHtml();
+    const inRoom = !!priv.yourRoom;
+    return `<div class="panel status">
+      <div class="eyebrow">${inRoom ? 'You are in' : 'You are in the corridor'}</div>
+      <div class="big" style="margin:.4rem 0 1rem">${inRoom ? esc(ROOM[priv.yourRoom].name) : 'Keep walking next turn'}</div>
+      <div class="stack">
+        ${priv.canSuggest ? `<button class="primary" data-mode="suggest">Make a suggestion</button>` : ''}
+        <button class="danger" data-mode="accuse">Formal accusation</button>
+        <button class="ghost" data-act="endTurn">End my turn</button>
+      </div>
+      <div class="muted" style="font-size:.78rem;margin-top:.9rem;line-height:1.55">
+        ${priv.canSuggest
+          ? `<b>Suggestion</b> = ask "Was it this person, with this weapon, in this room?" Others must secretly show you a card that proves you wrong.<br>`
+          : inRoom ? 'You have already made your suggestion this turn.<br>' : 'Suggestions can only be made inside a room.<br>'}
+        <b>Accusation</b> = your final answer. Right and you win. Wrong and you are out.</div>
+    </div>` + mapHtml(false) + handHtml();
+  }
+
+  // 7. Reveal belonging to someone else.
+  return `<div class="panel status">
+    <div class="eyebrow">Look at the big screen</div>
+    <div class="big">…</div>
+  </div>` + handHtml();
+}
+
+function suggestHtml() {
+  const ok = ui.sel.suspect && ui.sel.weapon;
+  return `<div class="panel status">
+    <div class="eyebrow">In the ${esc(ROOM[priv.yourRoom].name)}</div>
+    <div class="big" style="margin:.4rem 0 .9rem">Who, and with what?</div>
+    <div class="grid2">${B.suspects.map(s =>
+      `<button class="pick ${ui.sel.suspect === s.id ? 'on' : ''}" data-sel="suspect" data-val="${s.id}">
+        ${esc(s.name.split(' ').slice(-1)[0])}<small>${esc(s.name)}</small></button>`).join('')}</div>
+    <hr class="hairline" style="margin:.9rem 0">
+    <div class="grid2">${B.weapons.map(w =>
+      `<button class="pick ${ui.sel.weapon === w.id ? 'on' : ''}" data-sel="weapon" data-val="${w.id}">
+        ${esc(w.name)}</button>`).join('')}</div>
+    <div class="stack" style="margin-top:1rem">
+      <button class="primary" data-act="suggest" ${ok ? '' : 'disabled'}>
+        ${ok ? 'Say it out loud' : 'Pick a person and a weapon'}</button>
+      <button class="ghost" data-mode="idle">Back</button>
+    </div>
+  </div>`;
+}
+
+function accuseHtml() {
+  const s = ui.sel;
+  const ok = s.suspect && s.weapon && s.room;
+  return `<div class="panel status">
+    <div class="eyebrow blood">Formal accusation</div>
+    <div class="big" style="margin:.4rem 0 .9rem">Name all three.</div>
+    <div class="grid2">${B.suspects.map(x =>
+      `<button class="pick ${s.suspect === x.id ? 'on' : ''}" data-sel="suspect" data-val="${x.id}">
+        ${esc(x.name.split(' ').slice(-1)[0])}<small>${esc(x.name)}</small></button>`).join('')}</div>
+    <hr class="hairline" style="margin:.9rem 0">
+    <div class="grid2">${B.weapons.map(x =>
+      `<button class="pick ${s.weapon === x.id ? 'on' : ''}" data-sel="weapon" data-val="${x.id}">
+        ${esc(x.name)}</button>`).join('')}</div>
+    <hr class="hairline" style="margin:.9rem 0">
+    <div class="grid3">${B.rooms.map(x =>
+      `<button class="pick ${s.room === x.id ? 'on' : ''}" data-sel="room" data-val="${x.id}"
+        style="font-size:.78rem">${esc(x.name)}</button>`).join('')}</div>
+    <div class="stack" style="margin-top:1rem">
+      <button class="${ui.armed ? 'danger' : 'primary'}" data-act="accuse" ${ok ? '' : 'disabled'}>
+        ${!ok ? 'Name all three' : ui.armed ? 'Tap again — this is final' : 'Accuse'}</button>
+      <button class="ghost" data-mode="idle">Back</button>
+    </div>
+    <div class="muted" style="font-size:.75rem;margin-top:.8rem">
+      You do not need to be in the room you name. Get it wrong and your game ends.</div>
+  </div>`;
+}
+
+function cardFaceHtml(id) {
+  return `<div class="card-face"><div class="kind">${esc(cardKind(id))}</div>
+    <div class="title">${esc(cardName(id))}</div></div>`;
+}
+
+function handHtml() {
+  if (!priv.you.hand.length) return '';
+  return `<div>
+    <div class="eyebrow" style="margin:.4rem 0 .5rem">Your hand — nobody else sees this</div>
+    <div class="hand">${priv.you.hand.map(cardFaceHtml).join('')}</div>
+  </div>`;
+}
+
+// ---- notebook: the classic detective notepad
+//
+// One row per card, one column per player. A tick in someone's column means
+// they hold that card; a cross means they don't. Your own column is your hand
+// and fills itself in. When a card is shown to you, or someone fails to answer
+// a suggestion, the right boxes are pencilled in for you.
+const CELL_CYCLE = ['', 'no', 'yes', 'maybe'];
+const CELL_GLYPH = { '': '', no: '✕', yes: '✓', maybe: '?' };
+
+function notebookHtml() {
+  const seats = pub.players.slice();
+  // You first, then everyone else in seating order.
+  seats.sort((a, b) => (a.id === priv.you.id ? -1 : b.id === priv.you.id ? 1 : 0));
+  const grid = priv.you.grid || {};
+
+  const head = seats.map(p => {
+    const s = SUSPECT[p.charId];
+    const label = p.id === priv.you.id ? 'You' : esc((p.name || '').slice(0, 4));
+    return `<th class="${p.id === priv.you.id ? 'me' : ''}"><span class="dot" style="background:${s ? s.colour : '#999'}"></span>${label}</th>`;
+  }).join('');
+
+  const rowsFor = items => items.map(it => {
+    const have = priv.you.hand.includes(it.id);
+    const row = grid[it.id] || {};
+    const someoneHas = Object.values(row).includes('yes');
+    const out = have || someoneHas || priv.you.notes[it.id] === 'shown' || priv.you.notes[it.id] === 'no';
+    const cells = seats.map(p => {
+      if (p.id === priv.you.id) {
+        return `<td class="cell mine ${have ? 'm-yes' : 'm-no'}">${have ? '✓' : '✕'}</td>`;
+      }
+      const m = row[p.id] || '';
+      return `<td class="cell m-${m}" data-cell="${it.id}" data-col="${p.id}">${CELL_GLYPH[m]}</td>`;
+    }).join('');
+    return `<tr><td class="lbl ${out ? 'out' : ''}" data-note="${it.id}">${esc(it.name.replace(/^The /, ''))}</td>${cells}</tr>`;
+  }).join('');
+
+  const cols = seats.length + 1;
+  return `<div class="pad">
+    <h2>DETECTIVE NOTES</h2>
+    <div class="sub">Who · What · Where</div>
+    <table>
+      <colgroup><col style="width:${Math.max(34, 100 - seats.length * 11)}%">${seats.map(() => '<col>').join('')}</colgroup>
+      <thead><tr><th></th>${head}</tr></thead>
+      <tbody>
+        <tr class="grp"><td colspan="${cols}">WHO?</td></tr>${rowsFor(B.suspects)}
+        <tr class="grp"><td colspan="${cols}">WHAT?</td></tr>${rowsFor(B.weapons)}
+        <tr class="grp"><td colspan="${cols}">WHERE?</td></tr>${rowsFor(B.rooms)}
+      </tbody>
+    </table>
+  </div>
+  <div class="pad-key">
+    Tap a box to mark it: <b>✕</b> they don't have it · <b>✓</b> they have it · <b>?</b> not sure.<br>
+    A name gets <b>crossed out</b> once you know it is not in the envelope — someone holds it.
+    Whatever is left uncrossed at the end is your answer.
+  </div>`;
+}
+
+// ---- how to play
+function rulesHtml() {
+  return `<div class="rules">
+    <div class="panel goal">
+      <div class="eyebrow">Your goal</div>
+      <b>Work out WHO did it, WITH WHAT, and WHERE.</b>
+      <div class="muted" style="font-size:.8rem;margin-top:.4rem">The answer is three secret cards hidden in an envelope.</div>
+    </div>
+    <h3>1. Your cards</h3>
+    <p>Everyone else's cards are shared out between the players. Any card you hold <b>cannot</b> be in the envelope — so it's already ruled out on your notepad.</p>
+    <h3>2. On your turn</h3>
+    <ol>
+      <li><b>Roll two dice</b> and walk that many squares along the corridors (no diagonals). Walking through a door into a room ends your move.</li>
+      <li><b>Make a suggestion</b> — ask "Was it <i>this person</i>, with <i>this weapon</i>, in <i>this room</i>?"</li>
+      <li>The next player who holds one of those cards must <b>secretly show you one</b> on your phone. Nobody else sees which.</li>
+    </ol>
+    <h3>Shortcuts</h3>
+    <p>Corner rooms have <b>secret passages</b> to the opposite corner — take one instead of rolling. If someone's suggestion drags you into a room, you may <b>stay</b> and make your own suggestion there next turn.</p>
+    <h3>3. Take notes</h3>
+    <p>Open the <b>Notepad</b> tab and cross off every card you learn about. It pencils in the obvious ones for you.</p>
+    <h3>4. Accuse</h3>
+    <p>When only one person, one weapon and one room are left, make a <b>formal accusation</b>. Right, and you win. Wrong, and you're out — but you still have to show cards when asked.</p>
+    <h3>Tip</h3>
+    <p>If nobody can disprove a suggestion, the big screen goes red. Those three cards are either in the envelope — or in your own hand.</p>
+  </div>`;
+}
+
+// ---- a die face, with real pips
+function dieSvg(n, tumble) {
+  const P = { 1: [[50,50]], 2: [[28,28],[72,72]], 3: [[28,28],[50,50],[72,72]],
+    4: [[28,28],[72,28],[28,72],[72,72]], 5: [[28,28],[72,28],[50,50],[28,72],[72,72]],
+    6: [[28,26],[72,26],[28,50],[72,50],[28,74],[72,74]] };
+  const pips = (P[n] || []).map(([x, y]) => `<circle cx="${x}" cy="${y}" r="8.5" fill="#1a1512"/>`).join('');
+  const blank = n ? '' : '<text x="50" y="62" text-anchor="middle" font-size="34" fill="#b9ad96" font-family="Georgia">?</text>';
+  return `<svg class="die ${tumble ? 'tumble' : ''}" viewBox="0 0 100 100" aria-label="${n ? 'Rolled ' + n : 'Die'}">${pips}${blank}</svg>`;
+}
+
+// ------------------------------------------------------------------- wiring
+function wire() {
+  app.querySelectorAll('[data-act]').forEach(b => b.onclick = async () => {
+    const type = b.dataset.act;
+    try {
+      if (type === 'roll') { SFX.dice(); buzz([20, 40, 20, 40, 30]); }
+      else if (type === 'passage') SFX.passage();
+      else if (type === 'suggest') SFX.sting();
+    } catch (e) {}
+    if (type === 'suggest') {
+      b.disabled = true;
+      await act({ type: 'suggest', suspectId: ui.sel.suspect, weaponId: ui.sel.weapon });
+      ui.mode = 'idle'; ui.sel = {};
+      return;
+    }
+    if (type === 'accuse') {
+      if (!ui.armed) { ui.armed = true; return render(); }
+      b.disabled = true;
+      await act({ type: 'accuse', suspectId: ui.sel.suspect, weaponId: ui.sel.weapon, roomId: ui.sel.room });
+      ui.mode = 'idle'; ui.sel = {}; ui.armed = false;
+      return;
+    }
+    b.disabled = true;
+    await act({ type });
+  });
+
+  app.querySelectorAll('[data-go]').forEach(b =>
+    b.addEventListener('click', () => { buzz(15); act({ type: 'move', target: b.dataset.go }); }));
+  app.querySelectorAll('[data-toward]').forEach(b =>
+    b.onclick = () => { b.disabled = true; act({ type: 'toward', roomId: b.dataset.toward }); });
+
+  app.querySelectorAll('[data-disprove]').forEach(b =>
+    b.onclick = () => { b.disabled = true; try { SFX.card(); } catch (e) {} act({ type: 'disprove', cardId: b.dataset.disprove }); });
+
+  app.querySelectorAll('[data-mode]').forEach(b =>
+    b.onclick = () => { ui.mode = b.dataset.mode; ui.sel = {}; ui.armed = false; render(); });
+
+  app.querySelectorAll('[data-sel]').forEach(b =>
+    b.onclick = () => { ui.sel[b.dataset.sel] = b.dataset.val; ui.armed = false; render(); });
+
+  app.querySelectorAll('[data-flip]').forEach(b => b.onclick = () => {
+    ui.flipped = b.dataset.flip;
+    try { SFX.card(); } catch (e) {}
+    buzz(30);
+    render();
+  });
+
+  app.querySelectorAll('[data-cell]').forEach(td => td.onclick = () => {
+    const card = td.dataset.cell, col = td.dataset.col;
+    const grid = priv.you.grid || (priv.you.grid = {});
+    const row = grid[card] || (grid[card] = {});
+    const next = CELL_CYCLE[(CELL_CYCLE.indexOf(row[col] || '') + 1) % CELL_CYCLE.length];
+    if (next) row[col] = next; else delete row[col];   // optimistic, so the tap feels instant
+    render();
+    act({ type: 'note', cardId: card, col, value: next });
+  });
+
+  // Tapping a name crosses it off by hand (or un-crosses it). Cards you hold
+  // or were shown stay crossed — those are facts, not guesses.
+  app.querySelectorAll('[data-note]').forEach(b => b.onclick = () => {
+    const id = b.dataset.note;
+    const cur = priv.you.notes[id] || '';
+    if (cur === 'have' || cur === 'shown') return;
+    const next = cur === 'no' ? '' : 'no';
+    if (next) priv.you.notes[id] = next; else delete priv.you.notes[id];
+    render();
+    act({ type: 'note', cardId: id, value: next });
+  });
+}
+
+// Phones only allow sound after a tap, so the first tap anywhere switches it on.
+document.addEventListener('pointerdown', () => { try { SOUND.unlock(); } catch (e) {} }, { once: true });
+
+if (me) connect(); else renderJoin();
+</script>
+</body>
+</html>

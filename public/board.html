@@ -1,0 +1,1263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A Game of Consequence</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;650&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/public/theme.css">
+<style>
+  html, body { height: 100%; overflow: hidden; }
+  body.stage { display: flex; flex-direction: column; }
+
+  /* Everything scales off one unit so the whole board fits any projector. */
+  :root { --u: min(1.15vw, 1.8vh); }
+
+  .shell { flex: 1; display: flex; flex-direction: column; padding: calc(var(--u) * 2.2); gap: calc(var(--u) * 1.6); min-height: 0; }
+
+  /* ------------------------------------------------------------- top bar */
+  .bar { display: flex; align-items: baseline; gap: calc(var(--u) * 2); flex: none; }
+  .bar h1 { font-family: var(--font-display); font-size: calc(var(--u) * 2.3); font-weight: 600; letter-spacing: .16em; text-transform: uppercase; margin: 0; color: var(--paper-200); }
+  .bar .spacer { flex: 1; }
+  .bar .meta { font-size: calc(var(--u) * 1.25); color: var(--paper-400); letter-spacing: .14em; text-transform: uppercase; }
+  .bar .meta b { color: var(--brass-400); font-weight: 650; }
+
+  /* -------------------------------------------------------------- lobby */
+  .lobby { flex: 1; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr auto;
+           column-gap: calc(var(--u) * 4); row-gap: calc(var(--u) * 1.6); align-items: center; min-height: 0; }
+  .lobby .howto { grid-column: 1 / -1; }
+  .lobby-left { display: flex; flex-direction: column; gap: calc(var(--u) * 1.6); }
+  .lobby h2 { font-family: var(--font-display); font-size: calc(var(--u) * 3.4); line-height: 1.02; margin: 0; font-weight: 700; }
+  .lobby p { font-size: calc(var(--u) * 1.6); line-height: 1.6; color: var(--paper-400); margin: 0; max-width: 34ch; }
+  .joinbox { display: flex; align-items: center; gap: calc(var(--u) * 2.4); }
+  .qr { background: var(--paper-100); padding: calc(var(--u) * 1); border-radius: calc(var(--u) * 1.1); box-shadow: var(--shadow-deep); flex: none; }
+  .qr svg { display: block; width: min(calc(var(--u) * 18), 34vh); height: min(calc(var(--u) * 18), 34vh); }
+  /* The address must never wrap — a broken URL is a room full of people typing
+     the wrong thing. It shrinks to fit instead. */
+  .joinurl { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: calc(var(--u) * 1.7); color: var(--brass-400); letter-spacing: .01em; white-space: nowrap; }
+  .joinhint { font-size: calc(var(--u) * 1.2); color: var(--paper-600); margin-top: calc(var(--u) * .7); }
+
+  .seats { display: grid; grid-template-columns: 1fr 1fr; gap: calc(var(--u) * 1.1); align-content: start; }
+  .seat { display: flex; align-items: center; gap: calc(var(--u) * 1.2); padding: calc(var(--u) * 1.1); border-radius: var(--r-md); }
+  .seat.empty { border: 1px dashed rgba(236,231,220,.14); opacity: .5; }
+  .seat .face { width: calc(var(--u) * 5); height: calc(var(--u) * 5); border-radius: 50%; object-fit: cover; flex: none; box-shadow: 0 0 0 2px var(--tint), 0 4px 14px rgba(0,0,0,.6); }
+  .seat .who { min-width: 0; }
+  .seat .who b { display: block; font-family: var(--font-display); font-size: calc(var(--u) * 1.6); font-weight: 600; }
+  .seat .who small { font-size: calc(var(--u) * 1.15); color: var(--paper-400); }
+  .seat .pip { width: calc(var(--u) * .8); height: calc(var(--u) * .8); border-radius: 50%; background: var(--green-400); margin-left: auto; flex: none; }
+  .seat .pip.off { background: var(--paper-600); }
+  /* A stand-in reads as present but clearly not a person. */
+  .seat.bot { border-style: dashed; border-color: rgba(201,162,39,.3); }
+  .seat.bot .face { opacity: .72; }
+  .seat .who small em { font-style: normal; font-size: calc(var(--u) * .92);
+    letter-spacing: .16em; text-transform: uppercase; color: var(--brass-500); white-space: nowrap; }
+  .seat .drop { margin-left: auto; flex: none; padding: 0; width: calc(var(--u)*2.4); height: calc(var(--u)*2.4);
+    border-radius: 50%; font-size: calc(var(--u)*1.4); line-height: 1; color: var(--paper-400); background: transparent; }
+  .seat .drop:hover { color: var(--blood-400); border-color: var(--blood-400); }
+
+  .startrow { display: flex; align-items: center; gap: calc(var(--u) * 1.4); margin-top: calc(var(--u) * 1.4); }
+  .startrow button { font-size: calc(var(--u) * 1.6); padding: calc(var(--u) * 1.1) calc(var(--u) * 2.4); white-space: nowrap; }
+  .startrow .note { font-size: calc(var(--u) * 1.2); color: var(--paper-400); }
+
+  /* -------------------------------------------------------------- board */
+  .table { flex: 1; display: grid; grid-template-columns: 1fr calc(var(--u) * 26); gap: calc(var(--u) * 1.8); min-height: 0; }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); gap: calc(var(--u) * 1); min-height: 0; }
+
+  .room {
+    position: relative; border-radius: var(--r-md); overflow: hidden;
+    background: #0c0e13 center/cover no-repeat;
+    border: 1px solid rgba(236,231,220,.09);
+    display: flex; flex-direction: column; justify-content: flex-end;
+    padding: calc(var(--u) * .9);
+    transition: border-color .4s ease, box-shadow .4s ease, transform .4s ease;
+  }
+  .room::before {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(4,5,8,.34) 0%, rgba(4,5,8,.55) 48%, rgba(4,5,8,.88) 100%);
+  }
+  .room.here { border-color: var(--brass-400); box-shadow: 0 0 0 1px var(--brass-400), 0 0 calc(var(--u)*3.5) rgba(201,162,39,.32); }
+  .room.scene { border-color: var(--blood-400); box-shadow: 0 0 0 1px var(--blood-400), 0 0 calc(var(--u)*4) rgba(200,16,46,.36); }
+  .room.scene::before { background: linear-gradient(180deg, rgba(40,4,10,.4) 0%, rgba(10,4,6,.6) 48%, rgba(6,2,4,.9) 100%); }
+
+  .room .label { position: relative; font-family: var(--font-display); font-size: calc(var(--u) * 1.5); font-weight: 600; letter-spacing: .07em; text-shadow: 0 2px 10px rgba(0,0,0,.9); }
+  .room .weapons { position: relative; font-size: calc(var(--u) * 1.05); color: var(--paper-400); margin-top: calc(var(--u) * .25); line-height: 1.35; text-shadow: 0 2px 8px #000; }
+  .room .pawns { position: absolute; top: calc(var(--u) * .8); left: calc(var(--u) * .8); right: calc(var(--u) * .8); display: flex; flex-wrap: wrap; gap: calc(var(--u) * .5); }
+
+  .pawn {
+    width: calc(var(--u) * 3.4); height: calc(var(--u) * 3.4); border-radius: 50%;
+    object-fit: cover; object-position: top;
+    box-shadow: 0 0 0 2px var(--tint), 0 3px 10px rgba(0,0,0,.75);
+    transition: transform .3s ease, filter .3s ease;
+  }
+  .pawn.turn { transform: scale(1.22); box-shadow: 0 0 0 2px var(--brass-400), 0 0 calc(var(--u)*2) rgba(216,181,69,.8); }
+  .pawn.out { filter: grayscale(1) brightness(.5); }
+
+  /* --------------------------------------------------------- side panel */
+  .side { display: flex; flex-direction: column; gap: calc(var(--u) * 1.1); min-height: 0; }
+
+  .turncard { padding: calc(var(--u) * 1.4); text-align: center; }
+  .turncard .eyebrow { font-size: calc(var(--u) * .95); }
+  .turncard .face { width: calc(var(--u) * 8); height: calc(var(--u) * 8); border-radius: 50%; object-fit: cover; object-position: top; margin: calc(var(--u) * .9) auto; display: block; box-shadow: 0 0 0 2px var(--tint), 0 6px 20px rgba(0,0,0,.7); }
+  .turncard .nm { font-family: var(--font-display); font-size: calc(var(--u) * 1.9); font-weight: 600; line-height: 1.15; }
+  .turncard .doing { font-size: calc(var(--u) * 1.2); color: var(--paper-400); margin-top: calc(var(--u) * .5); }
+  .die { display: inline-grid; place-items: center; width: calc(var(--u) * 3.2); height: calc(var(--u) * 3.2); border-radius: calc(var(--u)*.6); background: var(--paper-100); color: var(--ink-900); font-family: var(--font-display); font-weight: 700; font-size: calc(var(--u) * 2); margin-top: calc(var(--u) * .7); }
+
+  .order { padding: calc(var(--u) * 1.1); display: flex; flex-direction: column; gap: calc(var(--u) * .55); }
+  .order .row { display: flex; align-items: center; gap: calc(var(--u) * .8); font-size: calc(var(--u) * 1.2); padding: calc(var(--u) * .35) calc(var(--u) * .4); border-radius: calc(var(--u)*.5); }
+  .order .row.on { background: rgba(201,162,39,.14); }
+  .order .row.out { opacity: .42; text-decoration: line-through; }
+  .order .dot { width: calc(var(--u) * 1.5); height: calc(var(--u) * 1.5); border-radius: 50%; flex: none; }
+  .order .row .cards { margin-left: auto; color: var(--paper-600); font-size: calc(var(--u) * 1.05); }
+
+  /* Newest at the bottom. The oldest line fades out rather than being sliced
+     in half by the panel edge. */
+  .ledger { flex: 1; padding: calc(var(--u) * 1.1); overflow: hidden; display: flex; flex-direction: column-reverse; gap: calc(var(--u) * .5); min-height: 0;
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 calc(var(--u) * 4), #000 100%);
+    mask-image: linear-gradient(180deg, transparent 0, #000 calc(var(--u) * 4), #000 100%); }
+  .ledger .line { font-size: calc(var(--u) * 1.15); line-height: 1.45; color: var(--paper-400); }
+  .ledger .line:last-child { color: var(--paper-100); }
+
+  /* ----------------------------------------------------------- overlays */
+  .curtain {
+    position: fixed; inset: 0; z-index: 800;
+    display: grid; place-items: center;
+    background: rgba(4,5,8,.93);
+    backdrop-filter: blur(9px);
+    padding: calc(var(--u) * 6);
+    animation: fade .45s ease both;
+  }
+  @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes rise { from { opacity: 0; transform: translateY(calc(var(--u) * 2)); } to { opacity: 1; transform: none; } }
+
+  .curtain .inner { text-align: center; max-width: 88vw; animation: rise .6s .12s ease both; }
+  .curtain .eyebrow { font-size: calc(var(--u) * 1.3); }
+  .curtain .huge { font-family: var(--font-display); font-size: calc(var(--u) * 4.6); line-height: 1.12; font-weight: 700; margin: calc(var(--u) * 1.4) 0; }
+  .curtain .sub { font-size: calc(var(--u) * 1.6); color: var(--paper-400); line-height: 1.6; }
+
+  .handover { display: flex; align-items: center; justify-content: center; gap: calc(var(--u) * 3); margin: calc(var(--u) * 2) 0 calc(var(--u) * .5); }
+  .handover img { width: calc(var(--u) * 13); height: calc(var(--u) * 13); border-radius: 50%; object-fit: cover; object-position: top;
+                  box-shadow: 0 0 0 3px var(--tint), 0 16px 40px rgba(0,0,0,.8); }
+  .handover .track { width: calc(var(--u) * 22); height: calc(var(--u) * 12); position: relative; }
+  .handover .facedown { position: absolute; top: 0; left: 0; width: calc(var(--u) * 8.5); height: calc(var(--u) * 12); border-radius: calc(var(--u)*.7);
+                        border: 2px solid var(--brass-500); box-shadow: 0 14px 30px rgba(0,0,0,.8);
+                        background: repeating-linear-gradient(45deg, #3a0c12 0 10px, #4a1018 10px 20px);
+                        animation: pass 2.4s .5s cubic-bezier(.5,0,.3,1) both; }
+  @keyframes pass { 0% { transform: translateX(0) rotate(-8deg); } 100% { transform: translateX(calc(var(--u) * 13.5)) rotate(6deg); } }
+  .three { display: flex; justify-content: center; gap: calc(var(--u) * 1.6); margin: calc(var(--u) * 2.4) 0; }
+  .three .card-face { width: calc(var(--u) * 17); padding: calc(var(--u) * 1.3); animation: rise .5s ease both; }
+  .three .card-face:nth-child(2) { animation-delay: .18s; }
+  .three .card-face:nth-child(3) { animation-delay: .36s; }
+  .three .card-face .kind { font-size: calc(var(--u) * .85); }
+  .three .card-face .title { font-size: calc(var(--u) * 1.7); }
+  .three .card-face .shot { width: 100%; aspect-ratio: 1; object-fit: cover; object-position: top; border-radius: calc(var(--u)*.5); margin-bottom: calc(var(--u)*.7); }
+
+  /* A lightning flash for the loud moments. */
+  .flash { position: fixed; inset: 0; z-index: 890; pointer-events: none; background: #fff; opacity: 0; }
+  .flash.go { animation: strike .85s ease-out; }
+  @keyframes strike {
+    0% { opacity: 0; } 6% { opacity: .55; } 12% { opacity: .05; }
+    20% { opacity: .38; } 30% { opacity: 0; } 100% { opacity: 0; }
+  }
+
+  /* Film grain — keeps a big flat projection from banding. */
+  .grain { position: fixed; inset: -50%; z-index: 880; pointer-events: none; opacity: .045;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+    animation: drift 700ms steps(3) infinite; }
+  @keyframes drift { 0% { transform: translate(0,0); } 33% { transform: translate(-3%,2%); } 66% { transform: translate(2%,-3%); } }
+
+  /* ============================================================ cinema
+     Cutscenes play above everything but the flash. Letterbox bars, a slow
+     Ken Burns drift on the paintings, and type that arrives line by line. */
+  #cinema { position: fixed; inset: 0; z-index: 860; background: #000; display: none; overflow: hidden; cursor: pointer; }
+  #cinema.on { display: block; animation: fade .5s ease both; }
+  #cinema::before, #cinema::after { content: ''; position: absolute; left: 0; right: 0; height: 11vh; background: #000; z-index: 5; }
+  #cinema::before { top: 0; } #cinema::after { bottom: 0; }
+  .sc { position: absolute; inset: 0; }
+  .sc-bg { position: absolute; inset: -4%; background: center/cover no-repeat; animation: kb 7s ease-out both; }
+  .sc-bg.dim::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 50%, rgba(0,0,0,.25), rgba(0,0,0,.85)); }
+  .sc-bg.red::after { background: radial-gradient(ellipse at 50% 50%, rgba(60,0,8,.35), rgba(10,0,2,.9)); }
+  @keyframes kb { from { transform: scale(1.12) translate(1.5%, 1%); } to { transform: scale(1) translate(0, 0); } }
+  .sc-center { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; z-index: 3; padding: 0 8vw; }
+  .sc-kicker { font-size: calc(var(--u) * 1.3); letter-spacing: .4em; text-transform: uppercase; color: var(--brass-400); opacity: 0; animation: rise .8s .3s ease both; }
+  .sc-title { font-family: var(--font-display); font-size: calc(var(--u) * 6.4); line-height: 1.05; font-weight: 700;
+              color: #f4ecdc; text-shadow: 0 6px 40px rgba(0,0,0,.9); margin: calc(var(--u)*1) 0; opacity: 0; animation: rise 1s .6s ease both; }
+  .sc-line { font-family: Georgia, serif; font-style: italic; font-size: calc(var(--u) * 2); color: #d8cdb6; opacity: 0;
+             text-shadow: 0 3px 16px #000; animation: rise .9s ease both; }
+  .sc-lineup { display: flex; gap: calc(var(--u) * 1.6); justify-content: center; margin-top: calc(var(--u) * 2); }
+  .sc-lineup figure { margin: 0; width: calc(var(--u) * 11); opacity: 0; animation: rise .7s ease both; }
+  .sc-lineup img { width: 100%; aspect-ratio: 3/4; object-fit: cover; object-position: top; border-radius: 6px;
+                   box-shadow: 0 0 0 2px var(--tint), 0 18px 40px rgba(0,0,0,.8); filter: sepia(.25) contrast(1.05); }
+  .sc-lineup figcaption { font-family: var(--font-display); font-size: calc(var(--u) * 1.15); margin-top: calc(var(--u)*.6); color: #efe6d2; }
+  .sc-lineup small { display: block; font-family: Georgia, serif; font-style: italic; font-size: calc(var(--u) * .9); color: #a89c86; margin-top: 2px; }
+  .sc-montage .sc-bg { opacity: 0; animation: mont 5.4s ease both; }
+  @keyframes mont { 0% { opacity: 0; transform: scale(1.15); } 15% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; transform: scale(1); } }
+
+  /* the die, rolling across a table */
+  .sc-dice { position: absolute; inset: 0; display: grid; place-items: center; z-index: 3;
+             background: radial-gradient(ellipse at 50% 60%, #1c3a24 0%, #0b150e 55%, #000 100%); }
+  .sc-dice svg { width: calc(var(--u) * 16); height: calc(var(--u) * 16); filter: drop-shadow(0 30px 30px rgba(0,0,0,.8));
+                 animation: roll 1.4s cubic-bezier(.25,.8,.35,1) both; }
+  @keyframes roll {
+    0% { transform: translate(-60vw, -30vh) rotate(-720deg) scale(.5); }
+    55% { transform: translate(4vw, 3vh) rotate(25deg) scale(1.08); }
+    75% { transform: translate(-1vw, -1vh) rotate(-8deg); }
+    100% { transform: none; }
+  }
+  .sc-dice .who { position: absolute; bottom: 16vh; left: 0; right: 0; text-align: center; font-family: var(--font-display);
+                  font-size: calc(var(--u) * 2.6); color: #f0e6cf; opacity: 0; animation: rise .6s 1.1s ease both; }
+
+  /* a suggestion: the accused slides in beside the question */
+  .sc-ask { position: absolute; inset: 0; display: grid; grid-template-columns: 40% 60%; align-items: center; z-index: 3; padding: 0 7vw; gap: 4vw; }
+  .sc-ask img { width: 100%; max-height: 62vh; object-fit: cover; object-position: top; border-radius: 8px;
+                box-shadow: 0 0 0 3px var(--tint), 0 30px 70px rgba(0,0,0,.9); animation: slidein .9s .2s cubic-bezier(.2,.8,.3,1) both; }
+  @keyframes slidein { from { transform: translateX(-30vw) rotate(-6deg); opacity: 0; } to { transform: none; opacity: 1; } }
+  .sc-ask .q { font-family: var(--font-display); color: #f4ecdc; }
+  .sc-ask .q div { opacity: 0; animation: rise .7s ease both; text-shadow: 0 4px 24px #000; }
+  .sc-ask .q .a { font-size: calc(var(--u) * 1.6); letter-spacing: .3em; text-transform: uppercase; color: var(--brass-400); }
+  .sc-ask .q .b { font-size: calc(var(--u) * 4.2); line-height: 1.1; margin: .2em 0; }
+  .sc-ask .q .c { font-family: Georgia, serif; font-style: italic; font-size: calc(var(--u) * 2.6); color: #d8cdb6; }
+
+  /* the envelope */
+  .sc-env { width: calc(var(--u) * 30); height: calc(var(--u) * 19); margin: calc(var(--u)*2) auto 0; position: relative;
+            background: linear-gradient(170deg, #d9c9a3, #b9a57a); border-radius: 6px; box-shadow: 0 30px 60px rgba(0,0,0,.8);
+            animation: rise .8s .2s ease both; opacity: 0; }
+  .sc-env::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 60%;
+                    background: linear-gradient(170deg, #cbb98f, #a99466); clip-path: polygon(0 0, 100% 0, 50% 100%);
+                    transform-origin: top; animation: flap 1s 1.4s ease both; }
+  .sc-env::after { content: 'CONFIDENTIAL'; position: absolute; bottom: 18%; left: 0; right: 0; text-align: center;
+                   font-family: var(--font-display); letter-spacing: .4em; color: #7a1a1a; font-size: calc(var(--u) * 1.3); }
+  @keyframes flap { to { transform: rotateX(180deg); } }
+
+  /* ---- the new cinema ---- */
+  .sc canvas.fx { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
+  .sc-bolt { position: absolute; inset: 0; z-index: 2; background: rgba(220,230,255,.0); animation: bolt 6s linear both; pointer-events: none; }
+  @keyframes bolt { 0%,30% { background: rgba(220,230,255,0); } 31% { background: rgba(220,230,255,.55); } 33% { background: rgba(220,230,255,.05); }
+                    35% { background: rgba(220,230,255,.4); } 40%,100% { background: rgba(220,230,255,0); } }
+
+  /* dice: two real cubes */
+  .sc-dice3d { position: absolute; inset: 0; z-index: 3; display: flex; align-items: center; justify-content: center; gap: calc(var(--u) * 5);
+               perspective: 1100px; background: radial-gradient(ellipse at 50% 60%, #1d4028 0%, #0b1a10 55%, #000 100%); }
+  .cube { --s: calc(var(--u) * 11); width: var(--s); height: var(--s); position: relative; transform-style: preserve-3d;
+          transition: transform 1.5s cubic-bezier(.2,.75,.3,1); }
+  .cube .f { position: absolute; inset: 0; background: radial-gradient(circle at 35% 30%, #fffaf0, #e8dfcc); border-radius: 16%;
+             box-shadow: inset 0 0 calc(var(--u)*1.2) rgba(0,0,0,.25); display: grid; grid-template: repeat(3, 1fr) / repeat(3, 1fr); padding: 12%; }
+  .cube .f i { width: 70%; height: 70%; margin: auto; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #3a2a22, #0d0806); }
+  .cube .f1 { transform: translateZ(calc(var(--s) / 2)); }
+  .cube .f6 { transform: rotateY(180deg) translateZ(calc(var(--s) / 2)); }
+  .cube .f3 { transform: rotateY(90deg) translateZ(calc(var(--s) / 2)); }
+  .cube .f4 { transform: rotateY(-90deg) translateZ(calc(var(--s) / 2)); }
+  .cube .f2 { transform: rotateX(90deg) translateZ(calc(var(--s) / 2)); }
+  .cube .f5 { transform: rotateX(-90deg) translateZ(calc(var(--s) / 2)); }
+  .sc-dice3d .who, .sc .caption-big { position: absolute; bottom: 15vh; left: 0; right: 0; text-align: center; font-family: var(--font-display);
+                  font-size: calc(var(--u) * 2.8); color: #f0e6cf; text-shadow: 0 4px 20px #000; opacity: 0; animation: rise .6s 1.4s ease both; z-index: 6; }
+
+  /* doors swinging open onto a room */
+  .doorway { position: absolute; inset: 0; perspective: 1500px; z-index: 4; }
+  .door { position: absolute; top: 0; bottom: 0; width: 50%;
+          background: linear-gradient(90deg, rgba(0,0,0,.35), transparent 12%, transparent 88%, rgba(0,0,0,.35)),
+                      repeating-linear-gradient(90deg, #3b2416 0 6px, #34200f 6px 9px, #412819 9px 15px);
+          box-shadow: inset 0 0 60px rgba(0,0,0,.7); }
+  .door::before { content: ''; position: absolute; inset: 9% 12%; border: 3px solid rgba(0,0,0,.45); box-shadow: inset 0 0 0 10px rgba(255,255,255,.03), inset 0 0 0 13px rgba(0,0,0,.35); }
+  .door::after { content: ''; position: absolute; top: 50%; width: calc(var(--u)*1.6); height: calc(var(--u)*1.6); border-radius: 50%;
+                 background: radial-gradient(circle at 35% 35%, #ffe7a0, #9a7a2a); box-shadow: 0 2px 6px #000; }
+  .door.l { left: 0; transform-origin: left center; animation: doorL 1.7s .5s cubic-bezier(.55,0,.3,1) both; }
+  .door.l::after { right: 8%; }
+  .door.r { right: 0; transform-origin: right center; animation: doorR 1.7s .5s cubic-bezier(.55,0,.3,1) both; }
+  .door.r::after { left: 8%; }
+  @keyframes doorL { to { transform: rotateY(-105deg); } }
+  @keyframes doorR { to { transform: rotateY(105deg); } }
+  .candle { position: absolute; inset: 0; z-index: 1; pointer-events: none; mix-blend-mode: overlay;
+            background: radial-gradient(ellipse at 30% 60%, rgba(255,170,60,.35), transparent 50%); animation: flicker 2.2s infinite; }
+  @keyframes flicker { 0%,100% { opacity: .8; } 20% { opacity: .55; } 40% { opacity: .95; } 60% { opacity: .6; } 80% { opacity: .9; } }
+
+  /* the chalk outline */
+  .sc-floor { position: absolute; inset: 0; background: repeating-linear-gradient(90deg, #26180f 0 5.2vw, #1a100a 5.2vw 5.35vw);
+              animation: kb 8s ease-out both; }
+  .sc-floor::after { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 48%, rgba(255,220,160,.18), rgba(0,0,0,.92) 58%); }
+  .chalk { position: absolute; left: 50%; top: 50%; height: 64vh; transform: translate(-50%, -50%) rotate(-18deg); z-index: 3; overflow: visible; }
+  .chalk path, .chalk circle { fill: none; stroke: #efeae0; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round;
+                               stroke-dasharray: 1600; stroke-dashoffset: 1600; animation: draw 3.2s .4s ease-in-out forwards;
+                               filter: drop-shadow(0 0 3px rgba(255,255,255,.35)); }
+  .chalk circle { stroke-dasharray: 130; stroke-dashoffset: 130; animation-delay: .1s; animation-duration: 1s; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  .sc-tag { position: absolute; z-index: 4; font-family: 'Special Elite', 'Courier New', monospace; font-size: calc(var(--u)*1.3);
+            background: #e8dcc0; color: #2a1f12; padding: .4em .8em; transform: rotate(8deg); box-shadow: 0 8px 20px rgba(0,0,0,.6);
+            opacity: 0; animation: rise .5s 2.8s ease both; }
+
+  /* cards that turn over */
+  .c3d { position: relative; transform-style: preserve-3d; }
+  .c3d .fr, .c3d .bk { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: calc(var(--u)*.8); overflow: hidden; }
+  .c3d .bk { transform: rotateY(180deg); border: 3px solid #c9a227;
+             background: repeating-linear-gradient(45deg, #3a0c12 0 12px, #4a1018 12px 24px); box-shadow: 0 20px 40px rgba(0,0,0,.8); }
+  .c3d .fr { background: linear-gradient(170deg, #f2ece0, #ddd5c4); box-shadow: 0 20px 40px rgba(0,0,0,.8); display: flex; flex-direction: column; }
+  .c3d .fr img { width: 100%; flex: 1; object-fit: cover; object-position: top; min-height: 0; }
+  .c3d .fr .ic { flex: 1; display: grid; place-items: center; color: #2a2016; background: radial-gradient(circle, #f7f1e4, #d8ccb4); }
+  .c3d .fr .ic svg { width: 58%; height: 58%; }
+  .c3d .fr .nm2 { font-family: var(--font-display); color: #1a1512; text-align: center; padding: .5em .3em .6em; font-size: calc(var(--u)*1.25); line-height: 1.1; }
+  .c3d .fr .kd { font-family: 'Special Elite', monospace; font-size: calc(var(--u)*.8); letter-spacing: .15em; color: #7c7362; text-align: center; padding-top: .5em; }
+  .deal { display: flex; gap: calc(var(--u)*1.3); justify-content: center; margin-top: calc(var(--u)*2); }
+  .deal .c3d { width: calc(var(--u)*12); height: calc(var(--u)*17); animation: dealin 1.1s cubic-bezier(.2,.8,.3,1) both; }
+  @keyframes dealin { from { transform: translateY(70vh) rotateY(180deg) rotateZ(-25deg); } 60% { transform: translateY(0) rotateY(180deg); } to { transform: none; } }
+  .trio { display: flex; gap: calc(var(--u)*2.5); justify-content: center; }
+  .trio .c3d { width: calc(var(--u)*15); height: calc(var(--u)*21); animation: flipup 1s cubic-bezier(.3,.8,.3,1) both; }
+  @keyframes flipup { from { transform: translateY(20vh) rotateY(180deg) scale(.7); opacity: 0; } 40% { opacity: 1; transform: translateY(0) rotateY(180deg); } to { transform: none; } }
+
+  /* the interrogation */
+  .spot { position: absolute; inset: 0; z-index: 2; pointer-events: none;
+          background: radial-gradient(circle at var(--x, 30%) 45%, transparent 0 16vw, rgba(0,0,0,.88) 26vw); animation: sweep 5s ease-in-out both; }
+  @keyframes sweep { 0% { --x: 90%; } 30% { --x: 22%; } 100% { --x: 26%; } }
+  @property --x { syntax: '<percentage>'; inherits: false; initial-value: 30%; }
+  .ask2 { position: absolute; inset: 0; z-index: 3; display: grid; grid-template-columns: 36% 1fr; align-items: center; padding: 0 6vw; gap: 3vw; }
+  .ask2 .suspect { width: 100%; max-height: 64vh; object-fit: cover; object-position: top; border-radius: 6px;
+                   box-shadow: 0 0 0 3px var(--tint), 0 30px 70px rgba(0,0,0,.9); animation: drop 1.1s .3s cubic-bezier(.3,1.4,.5,1) both; transform-origin: top center; }
+  @keyframes drop { from { transform: translateY(-80vh) rotate(-8deg); } 70% { transform: translateY(0) rotate(3deg); } to { transform: none; } }
+  .ask2 .right { display: flex; flex-direction: column; gap: calc(var(--u)*1.5); }
+  .ask2 .q { font-family: var(--font-display); font-size: calc(var(--u)*3.4); line-height: 1.1; color: #f4ecdc; text-shadow: 0 4px 24px #000; opacity: 0; animation: rise .7s 1s ease both; }
+  .ask2 .kick { font-size: calc(var(--u)*1.3); letter-spacing: .3em; text-transform: uppercase; color: var(--brass-400); opacity: 0; animation: rise .6s .6s ease both; }
+  .ask2 .pair { display: flex; gap: calc(var(--u)*1.6); }
+  .ask2 .pair .c3d { width: calc(var(--u)*12); height: calc(var(--u)*16); animation: flipup .9s both; }
+
+  /* a secret passage: falling into the dark */
+  .tunnel { position: absolute; inset: 0; z-index: 3; overflow: hidden;
+            background: radial-gradient(circle at 50% 50%, #000 0 4vw, #1a120a 18vw, #000 60vw); }
+  /* plain rings, no blur: cheap enough for any projector laptop */
+  .tunnel i { position: absolute; left: 50%; top: 50%; width: 10vw; height: 10vw; margin: -5vw; border-radius: 50%;
+              border: .8vw solid rgba(150,110,60,.45); will-change: transform, opacity; animation: tun 2.2s linear infinite; }
+  @keyframes tun { from { transform: scale(.05); opacity: 0; } 20% { opacity: 1; } to { transform: scale(9); opacity: .2; } }
+
+  /* the stamp that ends an accusation */
+  .bigstamp { position: absolute; left: 50%; top: 50%; z-index: 7; font-family: 'Special Elite', 'Courier New', monospace; font-size: calc(var(--u)*7);
+              letter-spacing: .08em; padding: .1em .45em; border: .12em double currentColor; border-radius: .12em;
+              transform: translate(-50%,-50%) rotate(-12deg); opacity: 0; animation: slam .45s cubic-bezier(.2,1.5,.4,1) forwards;
+              background: rgba(10,4,4,.35); text-shadow: 0 0 12px rgba(0,0,0,.6); }
+  .bigstamp.red { color: #e0243e; } .bigstamp.gold { color: #f2d16b; }
+  @keyframes slam { from { transform: translate(-50%,-50%) rotate(-12deg) scale(3); opacity: 0; } to { transform: translate(-50%,-50%) rotate(-12deg) scale(1); opacity: 1; } }
+
+  /* the envelope, sealed with wax */
+  .env2 { position: relative; width: calc(var(--u)*32); height: calc(var(--u)*20); margin: 0 auto;
+          background: linear-gradient(170deg, #dccca7, #b9a57a); border-radius: 6px; box-shadow: 0 30px 60px rgba(0,0,0,.8); }
+  .env2 .flap { position: absolute; left: 0; right: 0; top: 0; height: 58%; background: linear-gradient(170deg, #cfbd93, #a99466);
+                clip-path: polygon(0 0, 100% 0, 50% 100%); transform-origin: top; z-index: 3; }
+  .env2.sealing .flap { transform: rotateX(180deg); animation: shut .8s 2.4s ease forwards; }
+  .env2.opening .flap { animation: open .9s .5s ease forwards; }
+  @keyframes shut { to { transform: rotateX(0deg); } }
+  @keyframes open { to { transform: rotateX(180deg); } }
+  .env2 .wax { position: absolute; left: 50%; top: 52%; width: calc(var(--u)*5); height: calc(var(--u)*5); margin: calc(var(--u)*-2.5); z-index: 4;
+               border-radius: 50%; background: radial-gradient(circle at 35% 30%, #d0324a, #7a0c1c); box-shadow: 0 4px 10px rgba(0,0,0,.6);
+               display: grid; place-items: center; font-family: var(--font-display); color: rgba(255,210,210,.8); font-size: calc(var(--u)*2.2);
+               opacity: 0; animation: slam .4s 3.2s cubic-bezier(.2,1.5,.4,1) forwards; }
+  .env2 .wax { transform: none; }
+  .env2 .drop3 { position: absolute; left: 50%; top: -30vh; width: calc(var(--u)*7); height: calc(var(--u)*10); margin-left: calc(var(--u)*-3.5); z-index: 2;
+                 border: 2px solid #c9a227; border-radius: 6px; background: repeating-linear-gradient(45deg, #3a0c12 0 8px, #4a1018 8px 16px);
+                 animation: slidein2 .7s ease-in both; }
+  @keyframes slidein2 { from { transform: translateY(0); opacity: 1; } 85% { opacity: 1; } to { transform: translateY(40vh); opacity: 0; } }
+
+  #soundchip { position: fixed; right: 1.2rem; bottom: 1.2rem; z-index: 930; font-size: .85rem; background: rgba(26,30,40,.92);
+               border: 1px solid var(--brass-500); color: var(--brass-400); padding: .6rem 1rem; border-radius: 99px; animation: pulse 2s infinite; }
+  .hostbar .vol { display: flex; align-items: center; gap: .4rem; font-size: .8rem; color: var(--paper-400); background: rgba(26,30,40,.9);
+                  padding: .35rem .7rem; border-radius: var(--r-sm); border: var(--edge-soft); }
+
+  /* caption strip under the board: what just happened, and who we are waiting on */
+  .tablewrap { flex: 1; display: flex; flex-direction: column; gap: calc(var(--u) * 1.2); min-height: 0; }
+  .caption { flex: none; display: flex; align-items: center; gap: calc(var(--u) * 1.6); padding: calc(var(--u) * 1.1) calc(var(--u) * 1.6); }
+  .caption .now { flex: 1; font-family: var(--font-display); font-size: calc(var(--u) * 1.75); color: var(--paper-100); line-height: 1.25; }
+  .caption .wait { flex: none; text-align: right; font-size: calc(var(--u) * 1.2); color: var(--paper-400); max-width: 40%; }
+  .caption .wait b { color: var(--brass-400); font-weight: 650; }
+  .caption .pulse { width: calc(var(--u)*1); height: calc(var(--u)*1); border-radius: 50%; background: var(--brass-400); flex: none;
+                    animation: pulse 1.4s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .25; transform: scale(.7); } }
+
+  /* ============================================================ the house
+     The whole floor plan is one SVG, one unit per square. Pawns are SVG groups
+     that glide square to square with a CSS transition on their transform. */
+  /* The map fills whatever space the table leaves it and scales to fit, so it
+     never spills under the caption whatever shape the projector is. */
+  .mapwrap { position: relative; min-height: 0; min-width: 0; }
+  #map { position: absolute; inset: 0; width: 100%; height: 100%; display: block; overflow: visible;
+         filter: drop-shadow(0 20px 40px rgba(0,0,0,.7)); }
+  #map .floor { fill: #0d0b09; }
+  #map .cor { fill: url(#parquet); stroke: rgba(0,0,0,.55); stroke-width: .035; }
+  #map .rm-img { opacity: .9; }
+  #map .rm-shade { fill: url(#roomShade); }
+  #map .rm-wall { fill: none; stroke: #b8923a; stroke-width: .09; }
+  #map .rm-name { font-family: var(--font-display); font-size: .62px; fill: #f3ead6; letter-spacing: .04em;
+                  paint-order: stroke; stroke: rgba(0,0,0,.85); stroke-width: .14px; text-anchor: middle; }
+  #map .door { stroke: #e2c25a; stroke-width: .26; stroke-linecap: butt; }
+  #map .start { fill: none; stroke-width: .09; }
+  #map .centre { fill: #07060a; stroke: #6b5424; stroke-width: .09; }
+  #map .stair { fill: none; stroke: rgba(184,146,58,.28); stroke-width: .06; }
+  #map .qmark { font-family: var(--font-display); font-size: 1.7px; fill: rgba(226,194,90,.75); text-anchor: middle; }
+  #map .centre-label { font-family: var(--font-display); font-size: .42px; fill: rgba(226,194,90,.6); text-anchor: middle; letter-spacing: .12em; }
+  #map .passage { fill: rgba(0,0,0,.6); stroke: #b8923a; stroke-width: .05; }
+  #map .passage-t { font-size: .5px; fill: #e2c25a; text-anchor: middle; }
+  #map .reach { fill: rgba(226,194,90,.42); stroke: #e2c25a; stroke-width: .05; animation: reachp 1.3s ease-in-out infinite; }
+  @keyframes reachp { 50% { fill: rgba(226,194,90,.14); } }
+  #map .room-hl { fill: none; stroke: #f2d16b; stroke-width: .16; animation: reachp2 1.3s ease-in-out infinite; }
+  @keyframes reachp2 { 50% { stroke-opacity: .3; } }
+  #map .room-scene { fill: rgba(170,10,30,.22); stroke: #e04a62; stroke-width: .14; }
+  #map .weap { color: #e8d9b0; }
+  #map .weap circle { fill: rgba(0,0,0,.72); stroke: rgba(226,194,90,.6); stroke-width: .04; }
+  #map .pawn { transition: transform .55s cubic-bezier(.3,.7,.4,1), opacity .4s ease; }
+  #map .pawn.walking { transition: transform .17s linear; }
+  #map .pawn .ring { fill: none; stroke-width: .09; }
+  #map .pawn .halo { fill: none; stroke: #f2d16b; stroke-width: .07; opacity: 0; }
+  #map .pawn.turn .halo { opacity: 1; animation: halo 1.4s ease-in-out infinite; }
+  @keyframes halo { 50% { stroke-width: .16; opacity: .4; } }
+  #map .pawn.out image { filter: grayscale(1) brightness(.45); }
+  .table { grid-template-columns: minmax(0, 1fr) calc(var(--u) * 26); grid-template-rows: minmax(0, 1fr); }
+  .minidice { display: flex; gap: calc(var(--u)*.7); justify-content: center; margin-top: calc(var(--u)*.7); }
+  .minidice svg { width: calc(var(--u)*3.4); height: calc(var(--u)*3.4); }
+
+  /* the room you are in breathes a little */
+  .room .bg { position: absolute; inset: 0; background: center/cover no-repeat; z-index: 0; }
+  .room.here .bg, .room.scene .bg { animation: kb 14s ease-in-out infinite alternate; }
+  .room::before { z-index: 1; }
+  .room .label, .room .weapons { z-index: 2; }
+  .room .pawns { z-index: 3; }
+
+  /* the lobby's how-to-play */
+  .howto { display: grid; grid-template-columns: repeat(3, 1fr); gap: calc(var(--u) * 1); }
+  .howto div { padding: calc(var(--u) * 1); border-radius: var(--r-md); background: rgba(26,30,40,.7); border: var(--edge-soft); }
+  .howto b { display: block; font-family: var(--font-display); font-size: calc(var(--u) * 1.35); color: var(--brass-400); margin-bottom: calc(var(--u)*.3); }
+  .howto span { font-size: calc(var(--u) * 1.1); line-height: 1.45; color: var(--paper-200); }
+
+  .hostbar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 910; display: flex; gap: .6rem; justify-content: center; padding: .6rem; opacity: 0; transition: opacity .25s ease; }
+  .hostbar:hover, body.peek .hostbar { opacity: 1; }
+  .hostbar button { font-size: .8rem; padding: .5rem .9rem; }
+
+  .offline { position: fixed; top: 0; left: 0; right: 0; z-index: 920; background: var(--blood-600); color: #fff; text-align: center; padding: .5rem; font-size: .9rem; display: none; }
+  body.dropped .offline { display: block; }
+</style>
+</head>
+<body class="stage">
+
+<div class="grain"></div>
+<div class="flash" id="flash"></div>
+<div class="offline">Lost the connection to the game. Check the Terminal window is still running.</div>
+
+<div class="shell">
+  <div class="bar">
+    <h1>A Game of Consequence</h1>
+    <div class="spacer"></div>
+    <div class="meta" id="meta"></div>
+  </div>
+  <div id="main" style="flex:1;display:flex;min-height:0"></div>
+</div>
+
+<div id="overlay"></div>
+<div id="cinema" title="Click to skip"></div>
+
+<div class="hostbar">
+  <button id="h-full">Fullscreen (F)</button>
+  <label class="vol">Music <input type="range" id="h-vol" min="0" max="100" value="50"></label>
+  <button id="h-mute">Sound on</button>
+  <button id="h-reset">New game</button>
+</div>
+<button id="soundchip">🔊 Click anywhere for sound</button>
+
+<script src="/public/qr.js"></script>
+<script src="/public/sound.js"></script>
+<script>/*__BOOT__*/</script>
+<script>
+'use strict';
+const B = window.__BOOT__;
+const SUSPECT = {}, WEAPON = {}, ROOM = {};
+B.suspects.forEach(s => SUSPECT[s.id] = s);
+B.weapons.forEach(w => WEAPON[w.id] = w);
+B.rooms.forEach(r => ROOM[r.id] = r);
+
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g,
+  c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+const mainEl = document.getElementById('main');
+const metaEl = document.getElementById('meta');
+const overlayEl = document.getElementById('overlay');
+
+let pub = null;
+let seen = { room: null, revealKey: null, phase: null, turn: null };
+
+// -------------------------------------------------------------------- audio
+//
+// One narrator at a time, and never twice for the same moment. Browsers block
+// audio until the page is clicked, so the first gesture unlocks it.
+
+const narrator = new Audio();
+narrator.preload = 'auto';
+let audioReady = false;
+const unlock = () => {
+  if (audioReady) return;
+  audioReady = true;
+  narrator.play().catch(() => {});
+  narrator.pause();
+  SOUND.unlock();
+  document.getElementById('soundchip').style.display = 'none';
+  if (pub && pub.phase === 'lobby') MUSIC.lobby();
+  else if (pub && pub.phase === 'play') MUSIC.game();
+};
+// The music ducks under the narrator, then comes back.
+narrator.onplay = () => MUSIC.duck(true);
+narrator.onended = narrator.onpause = () => MUSIC.duck(false);
+document.addEventListener('click', unlock, { once: true });
+document.addEventListener('keydown', unlock, { once: true });
+
+function say(clip) {
+  if (!audioReady) return;
+  try {
+    narrator.pause();
+    narrator.src = '/public/audio/' + clip + '.mp3';
+    narrator.currentTime = 0;
+    narrator.volume = .9;
+    const p = narrator.play();
+    if (p && p.catch) p.catch(() => {});
+  } catch (e) { /* a missing clip must never stop the game */ }
+}
+
+function flash() {
+  const f = document.getElementById('flash');
+  f.classList.remove('go');
+  void f.offsetWidth;
+  f.classList.add('go');
+}
+
+// ---------------------------------------------------------------- transport
+
+let stream = null;
+function connect() {
+  if (stream) stream.close();
+  stream = new EventSource(`/events?role=host&key=${encodeURIComponent(B.hostKey)}`);
+  stream.onmessage = ev => {
+    document.body.classList.remove('dropped');
+    const msg = JSON.parse(ev.data);
+    if (msg.type === 'state') { pub = msg.pub; render(); }
+  };
+  stream.onerror = () => { document.body.classList.add('dropped'); };
+}
+
+async function host(type, extra) {
+  const r = await fetch('/api/host', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(Object.assign({ key: B.hostKey, type }, extra || {}))
+  });
+  return r.json().catch(() => ({}));
+}
+
+// ------------------------------------------------------------------- render
+
+function render() {
+  if (!pub) return;
+  metaEl.innerHTML = pub.phase === 'play'
+    ? `Round <b>${pub.round}</b> &nbsp;·&nbsp; Room <b>${esc(pub.code)}</b>`
+    : `Room <b>${esc(pub.code)}</b>`;
+
+  if (pub.phase === 'lobby') renderLobby(); else renderTable();
+  renderOverlay();
+  cues();
+}
+
+// ---- lobby
+let qrDrawn = '';
+function renderLobby() {
+  const seats = [];
+  for (let i = 0; i < 6; i++) {
+    const p = pub.players[i];
+    if (!p) { seats.push(`<div class="seat empty"><div class="who"><b>&nbsp;</b><small>empty seat</small></div></div>`); continue; }
+    const s = p.charId ? SUSPECT[p.charId] : null;
+    seats.push(`<div class="seat panel ${p.isBot ? 'bot' : ''}" style="--tint:${s ? s.colour : '#333'}">
+      ${s ? `<img class="face" src="/public/portraits/${s.id}.jpg" alt="">`
+          : `<div class="face" style="background:#222"></div>`}
+      <div class="who"><b>${esc(p.name)}</b>
+        <small>${p.isBot ? '<em>stand-in</em> · ' : ''}${s ? esc(s.name) : 'choosing…'}</small></div>
+      ${p.isBot
+        ? `<button class="drop" data-drop="${p.id}" title="Remove">&times;</button>`
+        : `<div class="pip ${p.connected ? '' : 'off'}"></div>`}
+    </div>`);
+  }
+
+  const humans = pub.players.filter(p => !p.isBot).length;
+  const need = pub.players.length < 3
+    ? `Three detectives at least — add stand-ins to fill the table. ${pub.players.length} so far.`
+    : (pub.canStart
+        ? (humans < pub.players.length ? 'Ready. The stand-ins play themselves.' : 'Everyone is ready.')
+        : 'Waiting for everyone to pick a character.');
+
+  mainEl.innerHTML = `<div class="lobby">
+    <div class="lobby-left">
+      <h2>Someone in this<br>room did it.</h2>
+      <div class="joinbox">
+        <div class="qr" id="qr"></div>
+        <div>
+          <div class="joinurl">${esc(B.joinUrl.replace(/^https?:\/\//, ''))}</div>
+          <div class="joinhint">Scan with your phone camera to take a seat — or type the address.
+            Same Wi-Fi as this computer.</div>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="seats">${seats.join('')}</div>
+      <div class="startrow">
+        <button class="primary" id="h-start" ${pub.canStart ? '' : 'disabled'}>Begin the evening</button>
+        <button id="h-bot" ${pub.players.length >= 6 ? 'disabled' : ''}>Add a stand-in</button>
+        <span class="note">${esc(need)}</span>
+      </div>
+    </div>
+    <div class="howto">
+      <div><b>1 · The secret</b><span>Three cards are hidden in an envelope: WHO did it, WITH WHAT, and WHERE.</span></div>
+      <div><b>2 · Ask questions</b><span>Roll, walk into a room and ask "Was it them, with that, in here?" Others must secretly show you a card that proves you wrong.</span></div>
+      <div><b>3 · Solve it</b><span>Cross off what you learn on your phone's notepad. Sure of all three? Accuse. Wrong, and you're out.</span></div>
+    </div>
+  </div>`;
+
+  // The lobby is rebuilt on every state push, so the code is encoded once and
+  // the markup reinserted each time — otherwise it vanishes the moment someone
+  // joins, which is exactly when everyone else is trying to scan it.
+  if (qrDrawn === '') {
+    try { qrDrawn = QR.svg(B.joinUrl, { size: 400, quiet: 2, ec: 'M' }); }
+    catch (e) { qrDrawn = null; }
+  }
+  const qrEl = document.getElementById('qr');
+  if (qrDrawn) qrEl.innerHTML = qrDrawn;
+  else { qrEl.style.display = 'none'; }
+  const btn = document.getElementById('h-start');
+  if (btn) btn.onclick = () => { unlock(); host('start'); };
+  const bot = document.getElementById('h-bot');
+  if (bot) bot.onclick = () => { unlock(); host('addBot'); };
+  document.querySelectorAll('[data-drop]').forEach(b =>
+    b.onclick = () => host('kick', { pid: b.dataset.drop }));
+}
+
+// ---- the board
+//
+// The house is drawn once. After that only the moving parts change: pawns,
+// weapons, and the glow on squares the current player can reach.
+
+const L = B.board;
+const SVGNS = 'http://www.w3.org/2000/svg';
+const WEAPON_ICON = {
+  candlestick: '<path d="M9 21h6M10.2 21l.8-8h2l.8 8M8 13h8M12 13V7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M12 2c1.6 2 1.6 3.3 0 4.4C10.4 5.3 10.4 4 12 2z" fill="#f2b441"/>',
+  opener: '<path d="M12 2l2.2 11h-4.4z" fill="currentColor"/><path d="M7.5 13h9M12 13v6M10 19.5h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>',
+  pipe: '<path d="M6 18L18 6" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/><path d="M4.6 16.6l2.8 2.8M16.6 4.6l2.8 2.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
+  revolver: '<path d="M3 8.5h13l2 2h3v2.5h-8l-1.2 2H9.4l-1.3 5H4.3l1.2-6.2H3z" fill="currentColor"/><circle cx="10.5" cy="11" r="1.2" fill="#111"/>',
+  cord: '<path d="M12 3.2a4.6 4.6 0 1 1 0 9.2a4.6 4.6 0 1 1 0-9.2M12 12.4c0 3.8-3 5-5 8.4M12 12.4c0 3.8 3 5 5 8.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>',
+  spanner: '<path d="M14.8 3.3a4.6 4.6 0 0 0 5.9 5.9l-9.8 9.8a2.2 2.2 0 0 1-3.1-3.1l9.8-9.8a4.6 4.6 0 0 1-2.8-2.8z" fill="currentColor"/>'
+};
+
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+function buildMap(svg) {
+  svg.innerHTML = `<defs>
+      <pattern id="parquet" width="1" height="1" patternUnits="userSpaceOnUse">
+        <rect width="1" height="1" fill="#2a1d14"/>
+        <rect width="1" height=".5" fill="#312218"/>
+        <path d="M0 .5h1M.5 0v.5M.25 .5v.5M.75 .5v.5" stroke="#1a110b" stroke-width=".03"/>
+      </pattern>
+      <linearGradient id="roomShade" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#000" stop-opacity=".15"/>
+        <stop offset=".6" stop-color="#000" stop-opacity=".4"/>
+        <stop offset="1" stop-color="#000" stop-opacity=".82"/>
+      </linearGradient>
+      <clipPath id="circ" clipPathUnits="objectBoundingBox"><circle cx=".5" cy=".5" r=".5"/></clipPath>
+      ${Object.entries(L.rooms).map(([id, r]) =>
+        `<clipPath id="clip-${id}"><rect x="${r[0]}" y="${r[1]}" width="${r[2] - r[0] + 1}" height="${r[3] - r[1] + 1}"/></clipPath>`).join('')}
+    </defs>`;
+
+  el('rect', { class: 'floor', x: 0, y: 0, width: L.w, height: L.h, rx: .3 }, svg);
+
+  // Corridors, one plank square at a time.
+  const g = el('g', {}, svg);
+  for (let y = 0; y < L.h; y++) for (let x = 0; x < L.w; x++) {
+    if (L.grid[y][x] === 1) el('rect', { class: 'cor', x, y, width: 1, height: 1 }, g);
+  }
+
+  // Starting squares, ringed in each guest's colour.
+  for (const [cid, [x, y]] of Object.entries(L.starts)) {
+    const c = SUSPECT[cid];
+    el('circle', { class: 'start', cx: x + .5, cy: y + .5, r: .36, stroke: c ? c.colour : '#888' }, svg);
+  }
+
+  // The stairwell, where the envelope waits.
+  const [cx0, cy0, cx1, cy1] = L.centre;
+  const cw = cx1 - cx0 + 1, ch = cy1 - cy0 + 1, mx = cx0 + cw / 2, my = cy0 + ch / 2;
+  el('rect', { class: 'centre', x: cx0, y: cy0, width: cw, height: ch, rx: .15 }, svg);
+  for (let i = 1; i <= 5; i++) el('circle', { class: 'stair', cx: mx, cy: my, r: i * .55 }, svg);
+  for (let i = 0; i < 12; i++) {
+    const a = i * Math.PI / 6;
+    el('line', { class: 'stair', x1: mx, y1: my, x2: mx + Math.cos(a) * 2.75, y2: my + Math.sin(a) * 2.75 }, svg);
+  }
+  const q = el('text', { class: 'qmark', x: mx, y: my + .6 }, svg); q.textContent = '?';
+  const cl = el('text', { class: 'centre-label', x: mx, y: cy1 + .7 }, svg); cl.textContent = 'THE STAIRWELL';
+
+  // Rooms: the painting, a shade so names read, the wall, the name.
+  for (const [id, r] of Object.entries(L.rooms)) {
+    const x = r[0], y = r[1], w = r[2] - r[0] + 1, h = r[3] - r[1] + 1;
+    const rg = el('g', { id: 'rm-' + id }, svg);
+    el('image', { class: 'rm-img', href: `/public/rooms/${id}-tile.jpg`, x, y, width: w, height: h,
+      preserveAspectRatio: 'xMidYMid slice', 'clip-path': `url(#clip-${id})` }, rg);
+    el('rect', { class: 'rm-shade', x, y, width: w, height: h }, rg);
+    el('rect', { class: 'rm-wall', x, y, width: w, height: h }, rg);
+    const t = el('text', { class: 'rm-name', x: x + w / 2, y: y + h - .38 }, rg);
+    t.textContent = ROOM[id].name.replace(/^The /, '').toUpperCase();
+    if (L.passages[id]) {
+      // a little archway in the room's outer corner: the passage
+      // top-left of the room, clear of the name (bottom) and the weapons (top-right)
+      const px = x + .55, py = y + .55;
+      el('circle', { class: 'passage', cx: px, cy: py, r: .38 }, rg);
+      const pt = el('text', { class: 'passage-t', x: px, y: py + .18 }, rg); pt.textContent = '⇄';
+    }
+  }
+
+  // Doors: a brass threshold on the wall.
+  for (const d of L.doors) {
+    const r = L.rooms[d.room];
+    let x1, y1, x2, y2;
+    if (d.side === 'w') { x1 = x2 = r[0]; y1 = d.y + .15; y2 = d.y + .85; }
+    else if (d.side === 'e') { x1 = x2 = r[2] + 1; y1 = d.y + .15; y2 = d.y + .85; }
+    else if (d.side === 'n') { y1 = y2 = r[1]; x1 = d.x + .15; x2 = d.x + .85; }
+    else { y1 = y2 = r[3] + 1; x1 = d.x + .15; x2 = d.x + .85; }
+    el('line', { class: 'door', x1, y1, x2, y2 }, svg);
+  }
+
+  el('g', { id: 'hl' }, svg);
+  el('g', { id: 'weap' }, svg);
+  el('g', { id: 'pawns' }, svg);
+}
+
+/** Where a pawn sits: the middle of its square, or a seat inside its room. */
+function pawnPos(p) {
+  if (p.cell) return [p.cell[0] + .5, p.cell[1] + .5];
+  const r = L.rooms[p.room];
+  if (!r) return [12, 12];
+  const inRoom = pub.players.filter(o => o.room === p.room);
+  const i = inRoom.findIndex(o => o.id === p.id);
+  const w = r[2] - r[0] + 1;
+  const cols = Math.max(1, Math.floor((w - .4) / 1.1));
+  return [r[0] + .75 + (i % cols) * 1.1, r[1] + .95 + Math.floor(i / cols) * 1.1];
+}
+function roomCentre(id) { const r = L.rooms[id]; return [(r[0] + r[2] + 1) / 2, (r[1] + r[3] + 1) / 2]; }
+function nodePos(n) {
+  if (n.startsWith('r:')) return roomCentre(n.slice(2));
+  const [x, y] = n.split(',').map(Number); return [x + .5, y + .5];
+}
+
+const walking = new Set();
+let lastMoveSeq = 0;
+
+function updateMap() {
+  const svg = document.getElementById('map');
+  const pawnsG = svg.querySelector('#pawns'), hl = svg.querySelector('#hl'), wg = svg.querySelector('#weap');
+
+  // Glow: where the mover could go, and the room of a suggestion.
+  hl.innerHTML = '';
+  if (pub.reach) {
+    for (const k of pub.reach.cells) { const [x, y] = k.split(',').map(Number); el('rect', { class: 'reach', x: x + .06, y: y + .06, width: .88, height: .88, rx: .12 }, hl); }
+    for (const id of pub.reach.rooms) { const r = L.rooms[id]; el('rect', { class: 'room-hl', x: r[0] + .08, y: r[1] + .08, width: r[2] - r[0] + .84, height: r[3] - r[1] + .84, rx: .1 }, hl); }
+  }
+  if (pub.suggestion) { const r = L.rooms[pub.suggestion.room]; el('rect', { class: 'room-scene', x: r[0], y: r[1], width: r[2] - r[0] + 1, height: r[3] - r[1] + 1 }, hl); }
+
+  // Weapons, lined up along the top of whichever room they are lying in.
+  wg.innerHTML = '';
+  const perRoom = {};
+  for (const [w, room] of Object.entries(pub.weaponAt || {})) (perRoom[room] = perRoom[room] || []).push(w);
+  for (const [room, list] of Object.entries(perRoom)) {
+    const r = L.rooms[room]; if (!r) continue;
+    list.forEach((w, i) => {
+      const x = r[2] + .5 - (i + 1) * .95, y = r[1] + .55;
+      const gw = el('g', { class: 'weap', transform: `translate(${x} ${y})` }, wg);
+      el('circle', { cx: .45, cy: .45, r: .46 }, gw);
+      const inner = el('svg', { x: .1, y: .1, width: .7, height: .7, viewBox: '0 0 24 24' }, gw);
+      inner.innerHTML = WEAPON_ICON[w] || '';
+      const t = el('title', {}, gw); t.textContent = WEAPON[w].name;
+    });
+  }
+
+  // Pawns: create once, then move.
+  for (const p of pub.players) {
+    const c = SUSPECT[p.charId]; if (!c) continue;
+    let g = pawnsG.querySelector(`[data-pid="${p.id}"]`);
+    if (!g) {
+      g = el('g', { class: 'pawn', 'data-pid': p.id }, pawnsG);
+      el('circle', { class: 'halo', r: .62 }, g);
+      el('circle', { r: .47, fill: c.colour }, g);
+      el('image', { href: `/public/portraits/${c.id}.jpg`, x: -.42, y: -.42, width: .84, height: .84,
+        'clip-path': 'url(#circ)', preserveAspectRatio: 'xMidYMin slice' }, g);
+      el('circle', { class: 'ring', r: .45, stroke: c.colour }, g);
+      const [x, y] = pawnPos(p);
+      g.setAttribute('transform', `translate(${x} ${y})`);
+      g.style.transform = `translate(${x}px, ${y}px)`;
+    }
+    g.classList.toggle('turn', p.id === pub.currentPlayerId);
+    g.classList.toggle('out', !!p.eliminated);
+    if (!walking.has(p.id)) {
+      const [x, y] = pawnPos(p);
+      g.style.transform = `translate(${x}px, ${y}px)`;
+    }
+  }
+
+  // A new move: walk it, square by square.
+  const m = pub.lastMove;
+  if (m && m.seq !== lastMoveSeq) {
+    const first = lastMoveSeq === 0;
+    lastMoveSeq = m.seq;
+    if (!first) animateMove(m);
+  }
+}
+
+function animateMove(m) {
+  if (reel.busy) { setTimeout(() => animateMove(m), 250); return; }   // let the dice land first
+  const g = document.querySelector(`#pawns [data-pid="${m.pid}"]`);
+  const p = pub.players.find(x => x.id === m.pid);
+  if (!g || !p) return;
+  const end = pawnPos(p);
+  if (m.kind === 'walk' && m.path.length > 1) {
+    walking.add(m.pid);
+    g.classList.add('walking');
+    const pts = m.path.slice(1, -1).map(nodePos).concat([end]);
+    host('hold', { ms: pts.length * 190 + 400 });
+    pts.forEach((pt, i) => setTimeout(() => {
+      g.style.transform = `translate(${pt[0]}px, ${pt[1]}px)`;
+      if (window.SFX) SFX.step(i);
+      if (i === pts.length - 1) setTimeout(() => {
+        g.classList.remove('walking'); walking.delete(m.pid);
+        const now = pub.players.find(x => x.id === m.pid);
+        if (now && now.room && m.path[m.path.length - 1] === 'r:' + now.room) queue(SCENES.enter(m.pid, now.room));
+      }, 250);
+    }, i * 180));
+  } else if (m.kind === 'passage') {
+    walking.add(m.pid);
+    g.style.opacity = 0;
+    if (window.SFX) SFX.passage();
+    setTimeout(() => { g.style.transition = 'none'; g.style.transform = `translate(${end[0]}px, ${end[1]}px)`;
+      void g.getBoundingClientRect(); g.style.transition = ''; g.style.opacity = 1; walking.delete(m.pid); }, 900);
+  } else {
+    g.style.transform = `translate(${end[0]}px, ${end[1]}px)`;   // summoned: glides across the house
+  }
+}
+
+function miniDie(n) {
+  const P = { 1: [[50,50]], 2: [[28,28],[72,72]], 3: [[28,28],[50,50],[72,72]],
+    4: [[28,28],[72,28],[28,72],[72,72]], 5: [[28,28],[72,28],[50,50],[28,72],[72,72]],
+    6: [[28,26],[72,26],[28,50],[72,50],[28,74],[72,74]] };
+  return `<svg viewBox="0 0 100 100"><rect x="4" y="4" width="92" height="92" rx="18" fill="#f4efe4"/>${(P[n] || []).map(([x, y]) => `<circle cx="${x}" cy="${y}" r="9" fill="#1a1512"/>`).join('')}</svg>`;
+}
+
+function renderTable() {
+  if (!document.getElementById('map')) {
+    mainEl.innerHTML = `<div class="tablewrap"><div class="table">
+      <div class="mapwrap"><svg id="map" viewBox="-.3 -.3 24.6 24.6" preserveAspectRatio="xMidYMid meet"></svg></div>
+      <div class="side" id="side"></div></div><div id="cap"></div></div>`;
+    buildMap(document.getElementById('map'));
+  }
+  updateMap();
+
+  const here = pub.players.find(p => p.id === pub.currentPlayerId);
+  const s = here ? SUSPECT[here.charId] : null;
+  const doing = {
+    roll: 'is deciding what to do', move: 'is on the move', action: here && here.room ? 'is in the room, thinking' : 'is in the corridor',
+    disprove: 'has put a suggestion to the table', reveal: 'has the room’s attention'
+  }[pub.turnPhase] || '';
+  const order = pub.players.map(p => {
+    const c = SUSPECT[p.charId];
+    return `<div class="row ${p.id === pub.currentPlayerId ? 'on' : ''} ${p.eliminated ? 'out' : ''}">
+      <div class="dot" style="background:${c.colour}"></div>
+      <span>${esc(p.name)}${p.isBot ? ' <i>·</i>' : ''}</span>
+      <span class="cards">${p.room ? esc(ROOM[p.room].name.replace(/^The /, '')) : 'corridor'}</span>
+    </div>`;
+  }).join('');
+  document.getElementById('side').innerHTML = `
+    <div class="turncard panel" style="--tint:${s ? s.colour : '#333'}">
+      <div class="eyebrow">Now moving</div>
+      ${s ? `<img class="face" src="/public/portraits/${s.id}.jpg" alt="">` : ''}
+      <div class="nm">${s ? esc(s.name) : ''}</div>
+      <div class="doing">${esc(here ? here.name : '')}${here && here.isBot ? ' (stand-in)' : ''} ${doing}</div>
+      ${pub.dice ? `<div class="minidice">${miniDie(pub.dice[0])}${miniDie(pub.dice[1])}</div>` : ''}
+    </div>
+    <div class="order panel">${order}</div>
+    <div class="ledger panel">${pub.log.slice().reverse().map(l => `<div class="line">${esc(l.line)}</div>`).join('')}</div>`;
+
+  const w = pub.waitingOn;
+  const wp = w ? pub.players.find(p => p.id === w.pid) : null;
+  const who = wp ? `<b>${esc(wp.name)}</b>` : '';
+  const how = !w ? '' : wp && wp.isBot
+    ? { roll: 'is about to roll', move: 'is choosing where to walk', action: 'is thinking…', disprove: 'is choosing a card to show',
+        read: 'is reading a card', ack: 'is taking it in' }[w.what] || 'is thinking…'
+    : { roll: 'roll the dice on your phone', move: 'choose where to walk on your phone', action: 'suggest, accuse or end your turn on your phone',
+        disprove: 'you must show a card — check your phone', read: 'check your phone — a card was shown to you',
+        ack: 'tap Continue on your phone' }[w.what] || '';
+  const latest = pub.log.length ? pub.log[pub.log.length - 1].line : '';
+  document.getElementById('cap').innerHTML = `<div class="caption panel">
+      <div class="pulse"></div>
+      <div class="now">${esc(latest)}</div>
+      <div class="wait">${w ? `Waiting on ${who} — ${esc(how)}` : ''}</div>
+    </div>`;
+}
+
+// ---- the big moments
+function renderOverlay() {
+  const r = pub.reveal;
+  if (!r) { overlayEl.innerHTML = ''; return; }
+
+  const cardHtml = (id, kind) => {
+    const item = SUSPECT[id] || WEAPON[id] || ROOM[id];
+    const shot = SUSPECT[id] ? `/public/portraits/${id}.jpg`
+      : ROOM[id] ? `/public/rooms/${id}-tile.jpg` : null;
+    return `<div class="card-face">
+      ${shot ? `<img class="shot" src="${shot}" alt="">` : ''}
+      <div class="kind">${kind}</div><div class="title">${esc(item.name)}</div></div>`;
+  };
+
+  const nameOf = pid => {
+    const p = pub.players.find(x => x.id === pid);
+    return p ? (p.charId ? SUSPECT[p.charId].name : p.name) : 'Someone';
+  };
+  const short = pid => { const p = pub.players.find(x => x.id === pid); return p ? p.name : 'Someone'; };
+  const face = pid => { const p = pub.players.find(x => x.id === pid); const c = p && SUSPECT[p.charId];
+    return c ? `<img src="/public/portraits/${c.id}.jpg" style="--tint:${c.colour}" alt="">` : ''; };
+
+  let inner = '';
+
+  if (r.kind === 'unchallenged') {
+    const s = pub.suggestion;
+    inner = `<div class="eyebrow">Nobody could disprove it</div>
+      <div class="huge">Nobody can prove ${esc(short(r.by))} wrong.</div>
+      <div class="three">${cardHtml(s.suspect, 'Person')}${cardHtml(s.weapon, 'Weapon')}${cardHtml(s.room, 'Place')}</div>
+      <div class="sub">Either one of those three is in the envelope — or someone at this table is holding it and keeping quiet.</div>`;
+  } else if (r.kind === 'disproved') {
+    inner = `<div class="eyebrow">A card changes hands</div>
+      <div class="handover">${face(r.by)}<div class="track"><div class="facedown"></div></div>${face(r.to)}</div>
+      <div class="huge">${esc(short(r.by))} shows ${esc(short(r.to))} a card.</div>
+      <div class="sub">Only ${esc(short(r.to))} sees which one. Everyone else — what does that tell you?</div>`;
+  } else if (r.kind === 'wrong') {
+    const a = r.accusation;
+    inner = `<div class="eyebrow blood">A formal accusation</div>
+      <div class="huge">${esc(short(r.by))} got it wrong.</div>
+      <div class="three">${cardHtml(a.suspect, 'Person')}${cardHtml(a.weapon, 'Weapon')}${cardHtml(a.room, 'Place')}</div>
+      <div class="sub">Out of the running — but still holding cards, and still obliged to answer.</div>`;
+  } else if (r.kind === 'solved') {
+    const sol = r.solution;
+    inner = `<div class="eyebrow">Case closed</div>
+      <div class="huge brass">${esc(short(r.by))} solved it.</div>
+      ${sol ? `<div class="three">${cardHtml(sol.suspect, 'Person')}${cardHtml(sol.weapon, 'Weapon')}${cardHtml(sol.room, 'Place')}</div>` : ''}
+      <div class="sub">The envelope is opened, and it says exactly that.</div>`;
+  } else if (r.kind === 'nobody') {
+    const sol = r.solution;
+    inner = `<div class="eyebrow blood">Unsolved</div>
+      <div class="huge">The murderer walks free.</div>
+      ${sol ? `<div class="three">${cardHtml(sol.suspect, 'Person')}${cardHtml(sol.weapon, 'Weapon')}${cardHtml(sol.room, 'Place')}</div>` : ''}
+      <div class="sub">Everyone guessed. Everyone was wrong.</div>`;
+  }
+
+  overlayEl.innerHTML = inner ? `<div class="curtain"><div class="inner">${inner}</div></div>` : '';
+}
+
+// ================================================================ cinema
+//
+// Cutscenes are built from the house's own paintings, portraits and narrator.
+// They queue, so a stand-in taking three actions in a row plays three scenes
+// in order rather than trampling each other; a long backlog plays faster.
+
+const cinemaEl = document.getElementById('cinema');
+const reel = { q: [], busy: false, timer: null };
+
+function play(scene) {
+  reel.q.push(scene);
+  if (!reel.busy) nextScene();
+}
+function nextScene() {
+  clearTimeout(reel.timer);
+  const sc = reel.q.shift();
+  if (!sc) { reel.busy = false; cinemaEl.classList.remove('on'); cinemaEl.innerHTML = ''; host('hold', { ms: 0 }); return; }
+  reel.busy = true;
+  cinemaEl.classList.remove('on'); void cinemaEl.offsetWidth;
+  cinemaEl.innerHTML = sc.html;
+  cinemaEl.classList.add('on');
+  if (sc.audio) say(sc.audio);
+  if (sc.sfx) { try { sc.sfx(); } catch (e) {} }
+  if (sc.after) requestAnimationFrame(() => { try { sc.after(cinemaEl); } catch (e) {} });
+  if (sc.flash) setTimeout(flash, sc.flash);
+  const ms = (reel.q.length >= 2 && !sc.keep) ? sc.ms * 0.55 : sc.ms;
+  // Hold the stand-ins for the length of this scene plus whatever is queued.
+  const queued = reel.q.reduce((t, x) => t + x.ms, 0);
+  host('hold', { ms: ms + queued });
+  reel.timer = setTimeout(nextScene, ms);
+}
+cinemaEl.onclick = () => nextScene();          // the host can skip
+
+const nm = pid => { const p = pub.players.find(x => x.id === pid); return p ? (SUSPECT[p.charId] || {}).name || p.name : 'Someone'; };
+const shortNm = pid => { const p = pub.players.find(x => x.id === pid); return p ? p.name : 'Someone'; };
+const cardNm = id => (SUSPECT[id] || WEAPON[id] || ROOM[id] || {}).name || id;
+
+function dieFace(n) {
+  const P = { 1: [[50,50]], 2: [[28,28],[72,72]], 3: [[28,28],[50,50],[72,72]],
+    4: [[28,28],[72,28],[28,72],[72,72]], 5: [[28,28],[72,28],[50,50],[28,72],[72,72]],
+    6: [[28,26],[72,26],[28,50],[72,50],[28,74],[72,74]] };
+  return `<svg viewBox="0 0 100 100"><rect x="4" y="4" width="92" height="92" rx="18" fill="#f4efe4"/>
+    <rect x="4" y="78" width="92" height="18" rx="9" fill="rgba(0,0,0,.12)"/>
+    ${(P[n] || []).map(([x, y]) => `<circle cx="${x}" cy="${y}" r="8.5" fill="#1a1512"/>`).join('')}</svg>`;
+}
+
+// ---- little helpers for scenes
+
+/** A particle layer: rain streaking down, or dust drifting in lamplight. */
+function fx(kind) {
+  const id = 'fx' + Math.random().toString(36).slice(2);
+  requestAnimationFrame(() => {
+    const cv = document.getElementById(id); if (!cv) return;
+    const c = cv.getContext('2d');
+    const W = cv.width = cv.clientWidth, H = cv.height = cv.clientHeight;
+    const n = kind === 'rain' ? 420 : 90;
+    const ps = Array.from({ length: n }, () => ({ x: Math.random() * W, y: Math.random() * H, v: kind === 'rain' ? 14 + Math.random() * 10 : .15 + Math.random() * .4,
+      r: kind === 'rain' ? 10 + Math.random() * 18 : .6 + Math.random() * 1.8, a: Math.random() * Math.PI * 2 }));
+    (function frame() {
+      if (!document.getElementById(id)) return;
+      c.clearRect(0, 0, W, H);
+      if (kind === 'rain') {
+        c.strokeStyle = 'rgba(180,200,230,.28)'; c.lineWidth = 1.2; c.beginPath();
+        for (const p of ps) { c.moveTo(p.x, p.y); c.lineTo(p.x - 3, p.y + p.r); p.y += p.v; p.x -= 1.2; if (p.y > H) { p.y = -20; p.x = Math.random() * W * 1.1; } }
+        c.stroke();
+      } else {
+        for (const p of ps) {
+          p.a += .01; p.y -= p.v; p.x += Math.sin(p.a) * .3;
+          if (p.y < -5) { p.y = H + 5; p.x = Math.random() * W; }
+          c.fillStyle = `rgba(255,225,170,${.15 + .25 * Math.abs(Math.sin(p.a))})`;
+          c.beginPath(); c.arc(p.x, p.y, p.r, 0, 7); c.fill();
+        }
+      }
+      requestAnimationFrame(frame);
+    })();
+  });
+  return `<canvas class="fx" id="${id}"></canvas>`;
+}
+
+const PIPS = { 1: [5], 2: [1, 9], 3: [1, 5, 9], 4: [1, 3, 7, 9], 5: [1, 3, 5, 7, 9], 6: [1, 3, 4, 6, 7, 9] };
+const face = n => `<div class="f f${n}">${[1,2,3,4,5,6,7,8,9].map(k => PIPS[n].includes(k) ? '<i></i>' : '<span></span>').join('')}</div>`;
+const cubeHtml = () => `<div class="cube">${[1,2,3,4,5,6].map(face).join('')}</div>`;
+const SHOW = { 1: [0, 0], 6: [0, 180], 3: [0, -90], 4: [0, 90], 2: [-90, 0], 5: [90, 0] };
+
+/** A card that turns over: a person, a weapon or a room. */
+function card3d(id, delay) {
+  const kind = SUSPECT[id] ? 'SUSPECT' : WEAPON[id] ? 'WEAPON' : 'ROOM';
+  const art = SUSPECT[id] ? `<img src="/public/portraits/${id}.jpg" alt="">`
+    : ROOM[id] ? `<img src="/public/rooms/${id}-tile.jpg" alt="" style="object-position:center">`
+    : `<div class="ic"><svg viewBox="0 0 24 24">${WEAPON_ICON[id] || ''}</svg></div>`;
+  return `<div class="c3d" style="animation-delay:${delay || 0}s"><div class="fr"><div class="kd">${kind}</div>${art}
+    <div class="nm2">${esc(cardNm(id).replace(/^The /, ''))}</div></div><div class="bk"></div></div>`;
+}
+
+const SCENES = {
+  opening() {
+    return [
+      { ms: 6500, keep: true, audio: 'intro-welcome', sfx: () => { SFX.thunder(.3); setTimeout(() => SFX.thunder(.7), 3200); }, html: `<div class="sc">
+          <div class="sc-bg dim" style="background-image:url('/public/rooms/ballroom.jpg')"></div>${fx('rain')}<div class="sc-bolt"></div>
+          <div class="sc-center"><div>
+            <div class="sc-kicker">A Game of Consequence</div>
+            <div class="sc-title">Hollowmere House</div>
+            <div class="sc-line" style="animation-delay:1.8s">A storm. A dinner party. And by midnight, a body.</div>
+          </div></div></div>` },
+      { ms: 6500, keep: true, sfx: () => SFX.heartbeat(6), html: `<div class="sc">
+          <div class="sc-floor"></div>
+          <svg class="chalk" viewBox="0 0 200 300"><circle cx="100" cy="36" r="18"/>
+            <path d="M88 58 L70 62 L40 40 L30 50 L64 80 L72 132 L60 202 L40 270 L55 277 L80 207 L96 152 L106 152 L118 207 L150 270 L163 261 L132 200 L126 132 L134 82 L170 112 L179 101 L140 60 L112 58 Z"/></svg>
+          <div class="sc-tag" style="left:58%;top:60%;max-width:26vw">EXHIBIT A · Lord Edgar Hollowmere · 12:04 a.m.</div>
+          <div class="sc-center" style="align-items:end;padding-bottom:16vh"><div class="sc-line" style="animation-delay:3.4s">Found dead at the foot of the stairs. The doors were locked from inside.</div></div>
+        </div>` },
+      { ms: 8200, keep: true, audio: 'intro-mystery', sfx: () => B.suspects.forEach((_, i) => setTimeout(() => SFX.card(), 400 + i * 330)), html: `<div class="sc">
+          <div class="sc-bg dim" style="background-image:url('/public/rooms/hall.jpg')"></div>${fx('dust')}
+          <div class="sc-center"><div>
+            <div class="sc-kicker">Six guests remain in the house</div>
+            <div class="deal">${B.suspects.map((x, i) => card3d(x.id, .3 + i * .33)).join('')}</div>
+          </div></div></div>` },
+      { ms: 5200, keep: true, sfx: () => { [0, 1, 2].forEach(i => setTimeout(() => SFX.card(), 300 + i * 500)); setTimeout(() => SFX.stamp(), 3250); }, html: `<div class="sc">
+          <div class="sc-center"><div>
+            <div class="sc-kicker">Three cards are sealed away</div>
+            <div class="env2 sealing" style="margin-top:4vh">
+              ${[0, 1, 2].map(i => `<div class="drop3" style="animation-delay:${.3 + i * .5}s"></div>`).join('')}
+              <div class="flap"></div><div class="wax">H</div></div>
+            <div class="sc-line" style="animation-delay:3.6s;margin-top:4vh">Who did it. With what. And where.</div>
+          </div></div></div>` },
+      { ms: 3800, keep: true, sfx: () => SFX.thunder(.1), flash: 200, html: `<div class="sc">
+          <div class="sc-center"><div>
+            <div class="sc-title" style="animation-delay:.2s">One of you did it.</div>
+            <div class="sc-line" style="animation-delay:1.2s">Check your phone. Your cards are in your hand.</div>
+          </div></div></div>` }
+    ];
+  },
+
+  roll(pid, dice) {
+    return [{ ms: 3000, sfx: () => SFX.dice(), after: el => {
+        const cubes = el.querySelectorAll('.cube');
+        cubes.forEach((c, i) => {
+          const r1 = Math.random() * 360, r2 = Math.random() * 360;
+          c.style.transition = 'none';
+          c.style.transform = `translate(${i ? 40 : -60}vw, ${-30 - i * 10}vh) rotateX(${r1}deg) rotateY(${r2}deg)`;
+          void c.offsetWidth;
+          const [rx, ry] = SHOW[dice[i]];
+          c.style.transition = '';
+          c.style.transform = `translate(0,0) rotateX(${rx + 720}deg) rotateY(${ry + (i ? -1080 : 1080)}deg) rotateZ(${i ? 8 : -6}deg)`;
+        });
+      }, html: `<div class="sc sc-dice3d">${cubeHtml()}${cubeHtml()}
+        <div class="who">${esc(shortNm(pid))} rolls ${dice[0] + dice[1]}</div></div>` }];
+  },
+
+  enter(pid, room) {
+    return [{ ms: 4600, audio: 'room-' + room, sfx: () => SFX.door(), html: `<div class="sc">
+        <div class="sc-bg dim" style="background-image:url('/public/rooms/${room}.jpg')"></div><div class="candle"></div>${fx('dust')}
+        <div class="doorway"><div class="door l"></div><div class="door r"></div></div>
+        <div class="sc-center" style="z-index:5"><div>
+          <div class="sc-kicker" style="animation-delay:1.3s">${esc(nm(pid))} enters</div>
+          <div class="sc-title" style="animation-delay:1.6s">${esc(cardNm(room))}</div>
+        </div></div></div>` }];
+  },
+
+  passage(pid, to) {
+    return [{ ms: 3400, sfx: () => SFX.passage(), html: `<div class="sc">
+        <div class="tunnel">${Array.from({ length: 8 }, (_, i) => `<i style="animation-delay:${-i * .275}s"></i>`).join('')}</div>
+        <div class="sc-center" style="z-index:5"><div>
+          <div class="sc-kicker">A panel slides open</div>
+          <div class="sc-title" style="font-size:calc(var(--u)*4.4)">${esc(shortNm(pid))} takes the secret passage</div>
+          <div class="sc-line" style="animation-delay:1.3s">…and steps out into ${esc(cardNm(to))}.</div>
+        </div></div></div>` }];
+  },
+
+  suggest(sg) {
+    const s = SUSPECT[sg.suspect];
+    return [{ ms: 6400, flash: 150, sfx: () => SFX.sting(), html: `<div class="sc">
+        <div class="sc-bg red" style="background-image:url('/public/rooms/${sg.room}.jpg')"></div>
+        <div class="spot"></div>
+        <div class="ask2" style="--tint:${s.colour}">
+          <img class="suspect" src="/public/portraits/${s.id}.jpg" alt="">
+          <div class="right">
+            <div class="kick">${esc(shortNm(sg.suggesterId))} suggests…</div>
+            <div class="q">"Was it ${esc(s.name)}…"</div>
+            <div class="pair">${card3d(sg.weapon, 1.9)}${card3d(sg.room, 2.6)}</div>
+          </div>
+        </div></div>` }];
+  },
+
+  accuse(r) {
+    const a = r.kind === 'solved' ? r.solution : r.accusation;
+    if (!a) return [];
+    const good = r.kind === 'solved';
+    return [{ ms: 7200, keep: true, audio: 'accusation-begin', sfx: () => {
+        SFX.heartbeat(3);
+        [0, 1, 2].forEach(i => setTimeout(() => SFX.card(), 2300 + i * 600));
+        setTimeout(() => { SFX.stamp(); good ? SFX.solved() : SFX.wrong(); }, 4700);
+      }, html: `<div class="sc">
+        <div class="sc-center"><div>
+          <div class="sc-kicker">${esc(shortNm(r.by))} makes a formal accusation</div>
+          <div class="env2 opening" style="width:calc(var(--u)*24);height:calc(var(--u)*6);margin:3vh auto 2vh"><div class="flap"></div></div>
+          <div class="trio">${card3d(a.suspect, 2.2)}${card3d(a.weapon, 2.8)}${card3d(a.room, 3.4)}</div>
+        </div></div>
+        <div class="bigstamp ${good ? 'gold' : 'red'}" style="animation-delay:4.6s">${good ? 'CASE CLOSED' : 'WRONG'}</div>
+      </div>` }];
+  }
+};
+
+const queue = scenes => scenes.forEach(play);
+
+// ---- fire each scene once, when the state first shows the moment
+let laughed = false;
+function cues() {
+  // In the lobby: the music, and once everyone has chosen, the laugh.
+  if (pub.phase === 'lobby') {
+    if (audioReady && MUSIC.playing !== 'lobby') MUSIC.lobby();
+    const humans = pub.players.filter(p => !p.isBot);
+    const ready = humans.length > 0 && humans.every(p => p.charId) && pub.canStart;
+    if (ready && !laughed && audioReady) {
+      laughed = true;
+      SFX.thunder(.2);
+      setTimeout(() => VOICE.play('/public/audio/laugh-goodluck.mp3', 1,
+        'Mwa ha ha ha ha ha! Good luck. You will need it.'), 700);
+    }
+    if (!ready) laughed = false;
+  }
+
+  if (pub.phase !== seen.phase) {
+    if (pub.phase === 'play' && seen.phase === 'lobby') {
+      queue(SCENES.opening());
+      if (audioReady) setTimeout(() => MUSIC.game(), 2000);
+    }
+    seen.phase = pub.phase;
+  }
+  if (pub.phase === 'lobby') return;
+
+  const cur = pub.players.find(p => p.id === pub.currentPlayerId);
+
+  // A roll of the dice.
+  if (pub.dice && cur && pub.turnPhase === 'move') {
+    const k = pub.round + ':' + cur.id + ':' + pub.dice.join('-');
+    if (seen.rollKey !== k) { seen.rollKey = k; queue(SCENES.roll(cur.id, pub.dice)); }
+  }
+
+  // Secret passages play at once; walking into a room plays when the pawn arrives (see animateMove).
+  const m = pub.lastMove;
+  if (m && m.kind === 'passage' && seen.passSeq !== m.seq) {
+    seen.passSeq = m.seq;
+    const p = pub.players.find(x => x.id === m.pid);
+    if (p && p.room) queue(SCENES.passage(m.pid, p.room));
+  }
+
+  // A suggestion put to the table.
+  const sg = pub.suggestion;
+  const sk = sg ? pub.round + ':' + sg.suggesterId + ':' + sg.suspect + ':' + sg.weapon : null;
+  if (sg && sk !== seen.suggestKey) { seen.suggestKey = sk; queue(SCENES.suggest(sg)); }
+
+  // The big verdicts.
+  const key = pub.reveal ? pub.reveal.kind + ':' + (pub.reveal.by || '') + ':' + pub.round : null;
+  if (key !== seen.revealKey) {
+    seen.revealKey = key;
+    const r = pub.reveal;
+    if (r) {
+      if (r.kind === 'unchallenged') { flash(); SFX.thunder(.1); }
+      else if (r.kind === 'disproved') { SFX.card(); }
+      else if (r.kind === 'wrong') { queue(SCENES.accuse(r)); setTimeout(() => say('accusation-incorrect'), 7400); }
+      else if (r.kind === 'solved') { queue(SCENES.accuse(r)); setTimeout(() => say('accusation-correct'), 7400); }
+      else if (r.kind === 'nobody') { SFX.wrong(); setTimeout(() => say('accusation-incorrect'), 600); }
+    }
+  }
+}
+
+// Now and then the storm reminds everyone where they are.
+setInterval(() => {
+  if (!pub || pub.phase !== 'play' || !audioReady || reel.busy) return;
+  if (Math.random() < .5) { SFX.thunder(.4 + Math.random() * .5); if (Math.random() < .6) flash(); }
+  else if (Math.random() < .5) SFX.clock(1 + Math.floor(Math.random() * 3));
+  else SFX.creak(.5);
+}, 55000);
+
+// -------------------------------------------------------------- host keys
+
+document.getElementById('h-full').onclick = () => {
+  if (document.fullscreenElement) document.exitFullscreen();
+  else document.documentElement.requestFullscreen().catch(() => {});
+};
+document.getElementById('h-reset').onclick = async () => {
+  if (!confirm('Start a new game? Everyone will have to rejoin.')) return;
+  const out = await host('reset');
+  if (out.code) location.reload();
+};
+
+document.getElementById('h-vol').oninput = e => MUSIC.setVolume(e.target.value / 100);
+let muted = false;
+document.getElementById('h-mute').onclick = e => {
+  e.stopPropagation(); unlock();
+  muted = !muted;
+  MUSIC.setVolume(muted ? 0 : document.getElementById('h-vol').value / 100);
+  narrator.muted = muted;
+  e.target.textContent = muted ? 'Sound off' : 'Sound on';
+};
+document.getElementById('soundchip').onclick = () => unlock();
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'f' || e.key === 'F') document.getElementById('h-full').click();
+  if (e.key === 'h' || e.key === 'H') document.body.classList.toggle('peek');
+});
+
+connect();
+</script>
+</body>
+</html>
